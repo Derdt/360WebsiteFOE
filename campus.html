@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Campus — Faculty of Engineering, NUOL</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Kanit:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/campus.css">
+
+  <!-- The import map must come BEFORE any module script. It also makes sure the whole
+       site uses one single copy of three.js (do not import three from unpkg elsewhere). -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+  <div id="stage"></div>
+  <div id="pins"></div>
+  <div id="tooltip"></div>
+
+  <header class="brand card">
+    <h1>Faculty of Engineering</h1>
+    <p>National University of Laos</p>
+    <a class="menu-link" href="index.html">← Menu</a>
+  </header>
+
+  <p id="hint" class="card">Drag to look around, scroll or pinch to zoom, tap a building</p>
+
+  <section id="infoPanel" class="card" hidden>
+    <button id="closePanel" aria-label="Close details">×</button>
+    <h2 id="buildingTitle"></h2>
+    <p id="buildingDesc"></p>
+    <a id="enterVR" class="btn" href="#" hidden>Enter VR</a>
+    <p id="vrNote" class="note" hidden>VR tour coming soon</p>
+  </section>
+
+  <nav id="chips" aria-label="Places on campus"></nav>
+
+  <div id="fallback" hidden></div>
+
+  <script type="module" src="js/campus-app.js"></script>
+</body>
+</html>

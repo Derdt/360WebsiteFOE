@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Engineering VR</title>
+
+    <link rel="stylesheet" href="../style.css">
+
+
+</head>
+
+<body>
+    <button id="backToCampus">Back</button>
+
+    <div id="viewer"></div>
+
+    <div id="overlay">
+
+        <div id="popup">
+
+            <img id="popupImage">
+
+            <h2 id="popupTitle"></h2>
+
+            <p id="popupText"></p>
+
+            <button id="closePopup">
+
+                Close
+
+            </button>
+
+        </div>
+
+    </div>
+
+    <script type="module" src="../js/engineering.js"></script>
+    <script type="importmap">
+            {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/"
+            }
+        }
+    </script>
+</body>
+
+</html>

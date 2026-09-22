@@ -1,0 +1,190 @@
+/* Styles for campus.html only (the other pages keep using style.css). */
+:root {
+  --card-bg: rgba(244, 250, 255, 0.9);
+  --card-fg: #12304a;
+  --card-muted: #4a7396;
+  --accent: #1e88e5;
+  --accent-soft: #cfe8ff;
+  --shadow: 0 6px 22px rgba(10, 50, 100, 0.28);
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --card-bg: rgba(14, 32, 52, 0.86);
+    --card-fg: #e8f4ff;
+    --card-muted: #9cc8ec;
+    --accent-soft: #1d4a7a;
+  }
+}
+[hidden] { display: none !important; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+html, body { height: 100%; margin: 0; }
+body {
+  background: #4aa8e8;
+  color: var(--card-fg);
+  font-family: 'Fredoka', 'Kanit', ui-rounded, 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+#stage { position: fixed; inset: 0; touch-action: none; cursor: grab; }
+#stage:active { cursor: grabbing; }
+#stage canvas { display: block; width: 100%; height: 100%; }
+#pins { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+
+.card {
+  background: var(--card-bg);
+  color: var(--card-fg);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.brand {
+  position: fixed;
+  left: 14px;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding: 10px 16px 11px;
+  max-width: calc(100% - 28px);
+}
+.brand h1 { margin: 0; font-size: 20px; line-height: 1.15; font-weight: 600; }
+.brand p { margin: 2px 0 0; font-size: 13.5px; color: var(--card-muted); }
+.menu-link { display: inline-block; margin-top: 8px; font-size: 13.5px; color: var(--accent); text-decoration: none; font-weight: 500; }
+.menu-link:hover { text-decoration: underline; }
+
+#hint {
+  position: fixed;
+  right: 14px;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--card-muted);
+  transition: opacity 0.6s ease;
+}
+#hint.gone { opacity: 0; pointer-events: none; }
+@media (max-width: 720px) {
+  #hint { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); right: 50%; transform: translateX(50%); white-space: nowrap; }
+}
+
+#tooltip {
+  position: fixed; left: 0; top: 0;
+  padding: 6px 12px;
+  background: var(--card-bg); color: var(--card-fg);
+  border-radius: 999px; box-shadow: var(--shadow);
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+  pointer-events: none; opacity: 0; transition: opacity 0.15s;
+  z-index: 30;
+}
+
+#chips {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  display: flex; gap: 8px;
+  padding: 2px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  justify-content: safe center;
+}
+#chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none;
+  font: 500 14px/1 'Fredoka', 'Kanit', ui-rounded, system-ui, sans-serif;
+  color: var(--card-fg);
+  background: var(--card-bg);
+  border: 0; border-radius: 999px;
+  padding: 10px 15px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+.chip:hover { transform: translateY(-1px); }
+.chip.on { background: var(--accent); color: #fff; }
+.chip:focus-visible, .pin:focus-visible .drop, #closePanel:focus-visible, .btn:focus-visible, .menu-link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+#infoPanel {
+  position: fixed;
+  right: 14px;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  width: min(320px, calc(100% - 28px));
+  padding: 20px 44px 20px 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  z-index: 20;
+}
+@media (max-width: 720px) {
+  #infoPanel {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 68px);
+    transform: translateX(-50%);
+    width: min(440px, calc(100% - 28px));
+    max-height: 60vh;
+  }
+}
+#infoPanel h2 {position:static; left: 50%; margin-top: 10px; font-size: 18px; font-weight: 600; align-self: center; text-align: center; }
+#infoPanel p { margin: 15px 10px 0; font-size: 14.5px; line-height: 1.45; color: var(--card-muted); }
+#infoPanel .note { 
+  position: absolute; left: 20%;
+  margin-top: 25px;
+  padding: 10px 20px; border-radius: 999px;
+  color:rgb(86, 86, 244);
+  line-height: 1.45;
+  font-size: 13.5px;
+  transition: transform 0.2s, background 0.2s;
+ }
+#closePanel {
+  position: absolute; right: 10px; top: 10px;
+  width: 28px; height: 28px; border: 0; border-radius: 50%;
+  background: var(--accent-soft); color: var(--card-fg);
+  font: 500 18px/1 'Fredoka', system-ui, sans-serif; cursor: pointer;
+}
+.btn {
+  position: absolute; left: 32%;
+  margin-top: 25px;
+  padding: 10px 20px; border-radius: 999px;
+  background: var(--accent); color: #fff; text-decoration: none;
+  font-size: 15px; font-weight: 500;
+  transition: transform 0.2s, background 0.2s;
+}
+.btn:hover { background: #42a5f5; transform: translateY(-1px); }
+
+/* Map pins (positioned every frame from 3D coordinates) */
+.pin { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: auto; cursor: pointer; will-change: transform; }
+.bob { position: absolute; left: 0; top: 0; animation: bob 2.4s ease-in-out infinite; }
+.drop {
+  position: absolute; left: -17px; top: -41px;
+  width: 34px; height: 34px;
+  background: var(--accent);
+  border: 2.5px solid #cfe8ff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  display: grid; place-items: center;
+  box-shadow: 0 4px 10px rgba(10, 40, 90, 0.35);
+  transition: background 0.2s, transform 0.2s;
+}
+.drop svg { width: 17px; height: 17px; fill: #fff; transform: rotate(45deg); }
+.pin:hover .drop, .pin.on .drop { background: #42a5f5; transform: rotate(-45deg) scale(1.14); }
+.tag {
+  position: absolute; left: 0; bottom: 52px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--card-bg); color: var(--card-fg);
+  padding: 5px 11px; border-radius: 999px;
+  font-size: 13px; font-weight: 500;
+  box-shadow: var(--shadow);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+.pin:hover .tag, .pin.on .tag, .pin.main .tag { opacity: 1; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) { .bob { animation: none; } }
+
+#fallback {
+  position: fixed; inset: 0; display: grid; place-items: center; text-align: center;
+  padding: 24px; font-size: 18px; color: #ffffff; background: #4aa8e8; z-index: 50;
+}
