@@ -401,23 +401,23 @@ export function createWorld(scene) {
   }
 
   /* ---------- mountains and clouds ---------- */
-  // function mountain(x, z, r, h) {
-  //   const g = new THREE.ConeGeometry(r, h, 8, 9, true), p = g.attributes.position, col = new Float32Array(p.count * 3);
-  //   const low = new THREE.Color(0x4e6b3a), rock = new THREE.Color(0x76837c), hi = new THREE.Color(0x8a9690), snow = new THREE.Color(0xe4f0f2), c = new THREE.Color();
-  //   for (let i = 0; i < p.count; i++) {
-  //     const px = p.getX(i), py = p.getY(i), pz = p.getZ(i), t0 = (py + h / 2) / h;
-  //     const jx = hash(px * 3.7 + py * 1.3, pz * 5.1 + py * 2.9) - 0.5, jz = hash(pz * 2.3 + py, px * 4.1 + py * 0.7) - 0.5;
-  //     if (t0 < 0.985) p.setXYZ(i, px + jx * r * 0.22, py + jx * h * 0.06, pz + jz * r * 0.22);
-  //     const tt = t0 + (hash(px * 1.7, pz * 2.3 + py) - 0.5) * 0.12;
-  //     c.copy(low).lerp(rock, smoothstep(0.15, 0.45, tt)).lerp(hi, smoothstep(0.45, 0.62, tt)).lerp(snow, smoothstep(0.62, 0.7, tt));
-  //     col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
-  //   }
-  //   g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
-  //   const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true }));
-  //   m.position.set(x, -3 + h / 2, z); m.rotation.y = hash(x, z) * 6; scene.add(m);
-  // }
-  // [[-88, -72, 38, 42], [-52, -62, 26, 26], [-20, -70, 22, 13], [16, -70, 32, 36], [55, -64, 34, 44], [92, -70, 38, 38],
-  //  [125, -52, 30, 32], [-120, -55, 34, 32], [-32, -105, 40, 46], [70, -105, 44, 52], [0, -125, 50, 40]].forEach((m) => mountain(m[0], m[1], m[2], m[3]));
+  function mountain(x, z, r, h) {
+    const g = new THREE.ConeGeometry(r, h, 8, 9, true), p = g.attributes.position, col = new Float32Array(p.count * 3);
+    const low = new THREE.Color(0x4e6b3a), rock = new THREE.Color(0x76837c), hi = new THREE.Color(0x8a9690), snow = new THREE.Color(0xe4f0f2), c = new THREE.Color();
+    for (let i = 0; i < p.count; i++) {
+      const px = p.getX(i), py = p.getY(i), pz = p.getZ(i), t0 = (py + h / 2) / h;
+      const jx = hash(px * 3.7 + py * 1.3, pz * 5.1 + py * 2.9) - 0.5, jz = hash(pz * 2.3 + py, px * 4.1 + py * 0.7) - 0.5;
+      if (t0 < 0.985) p.setXYZ(i, px + jx * r * 0.22, py + jx * h * 0.06, pz + jz * r * 0.22);
+      const tt = t0 + (hash(px * 1.7, pz * 2.3 + py) - 0.5) * 0.12;
+      c.copy(low).lerp(rock, smoothstep(0.15, 0.45, tt)).lerp(hi, smoothstep(0.45, 0.62, tt)).lerp(snow, smoothstep(0.62, 0.7, tt));
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true }));
+    m.position.set(x, -3 + h / 2, z); m.rotation.y = hash(x, z) * 6; scene.add(m);
+  }
+  [[-88, -72, 38, 42], [-52, -62, 26, 26], [-20, -70, 22, 13], [16, -70, 32, 36], [55, -64, 34, 44], [92, -70, 38, 38],
+   [125, -52, 30, 32], [-120, -55, 34, 32], [-32, -105, 40, 46], [70, -105, 44, 52], [0, -125, 50, 40]].forEach((m) => mountain(m[0], m[1], m[2], m[3]));
 
   const clouds = [];
   {
