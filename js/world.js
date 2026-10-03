@@ -325,24 +325,24 @@ export function createWorld(scene) {
   };
   const inBlocker = (px, py) => blockers.some((b) => px > b[0] && px < b[0] + b[2] && py > b[1] && py < b[1] + b[3]);
 
-  { // campus trees
-    const placedXZ = [];
-    let placed = 0, tries = 0;
-    while (placed < 42 && tries < 5000) {
-      tries++;
-      const px = rnd() * 640 + 4, py = rnd() * 456 + 4;
-      if (inBlocker(px, py)) continue;
-      if (Math.abs(py - 278) < 14 && px > 90 && px < 435) continue;
-      if (Math.abs(px - 425) < 14 && py > 278) continue;
-      const x = mx(px), z = mz(py);
-      if (distLine(x, z, ROAD_R.ax, ROAD_R.az, ROAD_R.bx, ROAD_R.bz) < 3.2) continue;   // stay clear of the right/diagonal road
-      if (Math.abs(z - ROAD_B_Z) < 3.2) continue;                                       // stay clear of the bottom road
-      if (placedXZ.some((q) => Math.hypot(x - q[0], z - q[1]) < 2.1)) continue;         // keep trees from crowding each other
-      placedXZ.push([x, z]);
-      if (rnd() < 0.5) addRound(x, 0, z, 0.9 + rnd() * 0.6); else addPine(x, 0, z, 0.8 + rnd() * 0.5);
-      placed++;
-    }
-  }
+  // { // campus trees
+  //   const placedXZ = [];
+  //   let placed = 0, tries = 0;
+  //   while (placed < 42 && tries < 5000) {
+  //     tries++;
+  //     const px = rnd() * 640 + 4, py = rnd() * 456 + 4;
+  //     if (inBlocker(px, py)) continue;
+  //     if (Math.abs(py - 278) < 14 && px > 90 && px < 435) continue;
+  //     if (Math.abs(px - 425) < 14 && py > 278) continue;
+  //     const x = mx(px), z = mz(py);
+  //     if (distLine(x, z, ROAD_R.ax, ROAD_R.az, ROAD_R.bx, ROAD_R.bz) < 3.2) continue;   // stay clear of the right/diagonal road
+  //     if (Math.abs(z - ROAD_B_Z) < 3.2) continue;                                       // stay clear of the bottom road
+  //     if (placedXZ.some((q) => Math.hypot(x - q[0], z - q[1]) < 2.1)) continue;         // keep trees from crowding each other
+  //     placedXZ.push([x, z]);
+  //     if (rnd() < 0.5) addRound(x, 0, z, 0.9 + rnd() * 0.6); else addPine(x, 0, z, 0.8 + rnd() * 0.5);
+  //     placed++;
+  //   }
+  // }
   { // hillside forest
     let placed = 0, tries = 0;
     while (placed < 420 && tries < 8000) {
@@ -402,33 +402,33 @@ export function createWorld(scene) {
 
   /* ---------- mountains and clouds ---------- */
   function mountain(x, z, r, h) {
-    const g = new THREE.ConeGeometry(r, h, 8, 9, true), p = g.attributes.position, col = new Float32Array(p.count * 3);
-    const low = new THREE.Color(0x4e6b3a), rock = new THREE.Color(0x76837c), hi = new THREE.Color(0x8a9690), snow = new THREE.Color(0xe4f0f2), c = new THREE.Color();
-    for (let i = 0; i < p.count; i++) {
-      const px = p.getX(i), py = p.getY(i), pz = p.getZ(i), t0 = (py + h / 2) / h;
-      const jx = hash(px * 3.7 + py * 1.3, pz * 5.1 + py * 2.9) - 0.5, jz = hash(pz * 2.3 + py, px * 4.1 + py * 0.7) - 0.5;
-      if (t0 < 0.985) p.setXYZ(i, px + jx * r * 0.22, py + jx * h * 0.06, pz + jz * r * 0.22);
-      const tt = t0 + (hash(px * 1.7, pz * 2.3 + py) - 0.5) * 0.12;
-      c.copy(low).lerp(rock, smoothstep(0.15, 0.45, tt)).lerp(hi, smoothstep(0.45, 0.62, tt)).lerp(snow, smoothstep(0.62, 0.7, tt));
-      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
-    }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true }));
-    m.position.set(x, -3 + h / 2, z); m.rotation.y = hash(x, z) * 6; scene.add(m);
+    // const g = new THREE.ConeGeometry(r, h, 8, 9, true), p = g.attributes.position, col = new Float32Array(p.count * 3);
+    // const low = new THREE.Color(0x4e6b3a), rock = new THREE.Color(0x76837c), hi = new THREE.Color(0x8a9690), snow = new THREE.Color(0xe4f0f2), c = new THREE.Color();
+    // for (let i = 0; i < p.count; i++) {
+    //   const px = p.getX(i), py = p.getY(i), pz = p.getZ(i), t0 = (py + h / 2) / h;
+    //   const jx = hash(px * 3.7 + py * 1.3, pz * 5.1 + py * 2.9) - 0.5, jz = hash(pz * 2.3 + py, px * 4.1 + py * 0.7) - 0.5;
+    //   if (t0 < 0.985) p.setXYZ(i, px + jx * r * 0.22, py + jx * h * 0.06, pz + jz * r * 0.22);
+    //   const tt = t0 + (hash(px * 1.7, pz * 2.3 + py) - 0.5) * 0.12;
+    //   c.copy(low).lerp(rock, smoothstep(0.15, 0.45, tt)).lerp(hi, smoothstep(0.45, 0.62, tt)).lerp(snow, smoothstep(0.62, 0.7, tt));
+    //   col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+    // }
+    // g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+    // const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true }));
+    // m.position.set(x, -3 + h / 2, z); m.rotation.y = hash(x, z) * 6; scene.add(m);
   }
   [[-88, -72, 38, 42], [-52, -62, 26, 26], [-20, -70, 22, 13], [16, -70, 32, 36], [55, -64, 34, 44], [92, -70, 38, 38],
    [125, -52, 30, 32], [-120, -55, 34, 32], [-32, -105, 40, 46], [70, -105, 44, 52], [0, -125, 50, 40]].forEach((m) => mountain(m[0], m[1], m[2], m[3]));
 
   const clouds = [];
   {
-    // const m1 = new THREE.MeshBasicMaterial({ color: 0xf4f9ff, fog: false }), m2 = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
-    // const blobs = [[0, 0, 0, 1, 0], [1.15, -0.1, 0.1, 0.8, 0], [-1.15, -0.15, 0, 0.75, 0], [0.5, 0.55, 0, 0.75, 1], [-0.4, 0.5, 0.1, 0.6, 1]];
-    // const geo = new THREE.SphereGeometry(1, 14, 10);
-    // [[-70, 44, -120, 14], [-30, 56, -135, 11], [20, 40, -125, 12], [62, 52, -130, 16], [105, 42, -115, 13], [-105, 38, -100, 12], [0, 66, -140, 15], [40, 30, -100, 8], [-52, 30, -105, 9]].forEach((s) => {
-    //   const g = new THREE.Group();
-    //   blobs.forEach((b) => { const m = new THREE.Mesh(geo, b[4] ? m2 : m1); m.position.set(b[0] * s[3], b[1] * s[3], b[2] * s[3]); m.scale.set(b[3] * s[3], b[3] * s[3] * 0.72, b[3] * s[3] * 0.8); g.add(m); });
-    //   g.position.set(s[0], s[1], s[2]); scene.add(g); clouds.push(g);
-    // });
+    const m1 = new THREE.MeshBasicMaterial({ color: 0xf4f9ff, fog: false }), m2 = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
+    const blobs = [[0, 0, 0, 1, 0], [1.15, -0.1, 0.1, 0.8, 0], [-1.15, -0.15, 0, 0.75, 0], [0.5, 0.55, 0, 0.75, 1], [-0.4, 0.5, 0.1, 0.6, 1]];
+    const geo = new THREE.SphereGeometry(1, 14, 10);
+    [[-70, 44, -120, 14], [-30, 56, -135, 11], [20, 40, -125, 12], [62, 52, -130, 16], [105, 42, -115, 13], [-105, 38, -100, 12], [0, 66, -140, 15], [40, 30, -100, 8], [-52, 30, -105, 9]].forEach((s) => {
+      const g = new THREE.Group();
+      blobs.forEach((b) => { const m = new THREE.Mesh(geo, b[4] ? m2 : m1); m.position.set(b[0] * s[3], b[1] * s[3], b[2] * s[3]); m.scale.set(b[3] * s[3], b[3] * s[3] * 0.72, b[3] * s[3] * 0.8); g.add(m); });
+      g.position.set(s[0], s[1], s[2]); scene.add(g); clouds.push(g);
+    });
   }
 
   /* ---------- traffic ---------- */
