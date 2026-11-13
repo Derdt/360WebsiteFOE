@@ -48,7 +48,10 @@ function start() {
     el.className = 'pin' + (p.main ? ' main' : '');
     el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-label', p.name);
     el.innerHTML = '<span class="bob"><span class="drop">' + (ICONS[p.icon] || ICONS.home) + '</span><span class="tag"></span></span>';
-    el.querySelector('.tag').textContent = p.short;
+    const tagEl = el.querySelector('.tag');
+    tagEl.textContent = p.short;
+    tagEl.style.opacity = '1';          // names visible at all times by default
+    tagEl.style.visibility = 'visible';
     el.addEventListener('click', () => select(sel === p.id ? null : p.id));
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(sel === p.id ? null : p.id); } });
     pinLayer.appendChild(el); p.el = el;
@@ -58,6 +61,20 @@ function start() {
     chip.addEventListener('click', () => select(sel === p.id ? null : p.id));
     chipBar.appendChild(chip); p.chip = chip;
   });
+  /* ---------- name-only labels: no icon, no click, just the building's name ---------- */
+  const nameLabels = world.labels || [];
+  nameLabels.forEach((p) => {
+    const el = document.createElement('div');
+    el.textContent = p.name;
+    el.setAttribute('aria-hidden', 'true');
+    Object.assign(el.style, {
+      position: 'absolute', left: '0', top: '0', pointerEvents: 'none',
+      background: 'rgba(15,20,30,0.72)', color: '#fff', font: '600 12px/1.3 system-ui, sans-serif',
+      padding: '2px 7px', borderRadius: '10px', whiteSpace: 'nowrap'
+    });
+    pinLayer.appendChild(el); p.el = el;
+  });
+
   const overview = document.createElement('button');
   overview.className = 'chip overview'; overview.type = 'button'; overview.textContent = 'Overview';
   overview.addEventListener('click', () => select(null));
@@ -66,14 +83,19 @@ function start() {
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') select(null); });
 
   /* ---------- camera state ---------- */
-  const home = { theta: 0.12, e: 0.3, r: 40, tx: 0, ty: 1, tz: -1 };
+  const home = { theta: 0.22, e: 0.55, r: 56, tx: 0, ty: 1, tz: -1 };   // locked overview angle, pulled back to show the fence + neighborhood
   const cam = { theta: 0.7, e: 0.06, r: 66, tx: 0, ty: 7, tz: -8 };    // start values: the intro swoops into `goal`
   const goal = { ...home };
   let sel = null, hover = null, lastInput = -10, time = 0, fit = 1;
 
   function select(id) {
     sel = id;
-    places.forEach((p) => { p.el.classList.toggle('on', p.id === id); p.chip.classList.toggle('on', p.id === id); });
+    places.forEach((p) => {
+      p.el.classList.toggle('on', p.id === id);
+      p.chip.classList.toggle('on', p.id === id);
+      const tagEl = p.el.querySelector('.tag');
+      if (tagEl) tagEl.style.visibility = (p.id === id) ? 'hidden' : 'visible';
+    });
     overview.classList.toggle('on', !id);
     if (id) {
       const p = places.find((q) => q.id === id);
@@ -119,18 +141,8 @@ function start() {
       else tooltip.style.opacity = 0;
       return;
     }
-    if (pointers.size === 1) {
-      goal.theta -= (e.clientX - p.x) * 0.005;
-      goal.e += (e.clientY - p.y) * 0.004;
-      goal.theta = Math.max(-0.85, Math.min(0.85, goal.theta));
-      goal.e = Math.max(0.1, Math.min(1.15, goal.e));
-    }
+    // Camera angle is locked: drag-to-rotate and pinch-to-zoom are intentionally disabled.
     p.x = e.clientX; p.y = e.clientY;
-    if (pointers.size === 2) {
-      const a = [...pointers.values()], d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
-      if (pinch > 0) goal.r = Math.max(12, Math.min(75, goal.r * (pinch / d)));
-      pinch = d;
-    }
     touched();
   });
   const endPointer = (e) => { pointers.delete(e.pointerId); pinch = 0; };
@@ -142,7 +154,8 @@ function start() {
   });
   stage.addEventListener('pointercancel', (e) => { endPointer(e); downAt = null; });
   stage.addEventListener('pointerleave', () => { hover = null; tooltip.style.opacity = 0; });
-  stage.addEventListener('wheel', (e) => { e.preventDefault(); goal.r = Math.max(12, Math.min(75, goal.r * Math.exp(e.deltaY * 0.001))); touched(); }, { passive: false });
+  // Camera angle is locked: wheel-zoom is intentionally disabled.
+  stage.addEventListener('wheel', (e) => { e.preventDefault(); }, { passive: false });
 
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
@@ -162,16 +175,16 @@ function start() {
     const k = 1 - Math.exp(-dt * (reduce ? 20 : 3.2));
     for (const key of ['theta', 'e', 'r', 'tx', 'ty', 'tz']) cam[key] += (goal[key] - cam[key]) * k;
 
-    const idle = smooth(4, 7, time - lastInput) * (sel ? 0 : 1) * (reduce ? 0 : 1);
+    const idle = 0;   // camera angle is locked — no auto-sway
     const th = cam.theta + Math.sin(time * 0.22) * 0.16 * idle, dist = cam.r * fit;
     camera.position.set(cam.tx + dist * Math.sin(th) * Math.cos(cam.e), cam.ty + dist * Math.sin(cam.e), cam.tz + dist * Math.cos(th) * Math.cos(cam.e));
     camera.lookAt(cam.tx, cam.ty, cam.tz); camera.updateMatrixWorld();
 
     world.update(dt, time, camera);
-    for (const p of places) {                                   // soft glow on hovered / selected building
-      const target = (p.id === hover || p.id === sel) ? 0.2 : 0, m = p.hit.material;
-      m.opacity += (target - m.opacity) * Math.min(1, dt * 10);
-    }
+    // for (const p of places) {
+    //   const m = p.hit.material;
+    //   m.opacity = 0;
+    // }
     renderer.render(scene, camera);
 
     const w = window.innerWidth, h = window.innerHeight;
@@ -183,6 +196,16 @@ function start() {
       const x = (v3.x * 0.5 + 0.5) * w, y = (-v3.y * 0.5 + 0.5) * h;
       const s = Math.max(0.7, Math.min(1.25, 48 / camera.position.distanceTo(p.anchor)));
       p.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${s.toFixed(3)})`;
+      p.el.style.zIndex = Math.round(y);
+    }
+    for (const p of nameLabels) {
+      v3.copy(p.anchor).project(camera);
+      const vis = v3.z < 1 && Math.abs(v3.x) < 1.15 && Math.abs(v3.y) < 1.15;
+      p.el.style.display = vis ? '' : 'none';
+      if (!vis) continue;
+      const x = (v3.x * 0.5 + 0.5) * w, y = (-v3.y * 0.5 + 0.5) * h;
+      const s = Math.max(0.7, Math.min(1.1, 44 / camera.position.distanceTo(p.anchor)));
+      p.el.style.transform = `translate(-50%, -100%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${s.toFixed(3)})`;
       p.el.style.zIndex = Math.round(y);
     }
     requestAnimationFrame(frame);

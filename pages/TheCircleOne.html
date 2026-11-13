@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Street View Panorama App</title>
+  <style>
+    body {
+      margin: 0;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+
+  <!-- Import Map for Three.js via unpkg -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.186.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.186.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <script type="module" src="/pages/Circle/main.js"></script>
+</body>
+</html>
