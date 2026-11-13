@@ -16,14 +16,101 @@ export const ROAD_RIGHT = { from: [780, -300], to: [780, 900], width: 2.6 }; // 
 export const ROAD_BOTTOM = {y: 690, width: 1.8 };                  // road along the bottom
 export const LAKE = { x: -21, z: 25, rx: 12, rz: 9, waterY: -0.85 };
 
+// ---------------------------------------------------------------------------
+// Inner campus road pieces (block1.glb).  One row per piece: [x, y, scale, rot]
+//   x, y  = screenshot pixels,  scale = modelScale,  rot = Math.PI / rot
+
+export const EFFECTS = { night: true, fireworks: true, snow: false, ui: true, uiCorner: 'bottom-left', remember: true };
+// ---------------------------------------------------------------------------
+const ROAD_PIECES = [
+  [380, 470, 0.12, 2],
+  [380, 580, 0.12, 2],
+  [380, 340, 0.12, 2],
+  [380, 218, 0.12, 2],
+  [320, 160, 0.1, 1],
+  [290, 110, 0.1, 2],
+  [260, 110, 0.1, 3],
+  [225, 215, 0.1, 2.1],
+  [220, 270, 0.1, 2.1],
+  [240, 60, 0.08, 1],
+  [190, 60, 0.08, 1],
+  [310, 335, 0.1, 1],
+  [200, 333, 0.1, 1.01],
+  [115, 332, 0.1, 1],
+  [290, 0, 0.1, 2],
+  [290, -100, 0.1, 2],
+  [290, -170, 0.1, 2],
+  [240, -190, 0.1, -1.02],
+  [240, -230, 0.1, 1.1],
+  [130, -250, 0.1, 1.01],
+  [50, -250, 0.1, 1],
+  [130, -181, 0.1, -1.03],
+  [130, -210, 0.07, 2],
+  [23, -174, 0.1, -1.01],
+  [-20, -225, 0.08, 2.09],
+  [335, -260, 0.05, 2],
+  [335, -305, 0.05, 2],
+  [335, -360, 0.05, 2],
+  [335, -420, 0.05, 2],
+  [335, -460, 0.05, 2],
+  [335, -425, 0.05, 2],
+  [335, -490, 0.05, 2],
+  [335, -530, 0.05, 2],
+  [335, -590, 0.05, 2],
+  [335, -640, 0.05, 2],
+  [300, -560, 0.05, 1],
+  [240, -560, 0.05, 1],
+  [185, -560, 0.05, 1],
+  [130, -560, 0.05, 1],
+  [80, -560, 0.05, 1],
+  [20, -560, 0.05, 1],
+  [-15, -500, 0.1, 2],
+  [-15, -390, 0.1, 2],
+  [-15, -295, 0.1, 2],
+  [240, -160, 0.04, -1.5],
+  [350, -215, 0.1, 1],
+  [460, -215, 0.1, 1],
+  [570, -215, 0.1, 1],
+  [610, -215, 0.1, 1],
+  [-50, -260, 0.1, 1.04],
+  [-150, -268, 0.1, 1.01],
+  [-190, -270, 0.1, 1.01],
+  [-250, -285, 0.05, 1.11],
+  [-300, -301, 0.05, 1.11],
+  [-350, -317, 0.05, 1.11],
+  [-400, -333, 0.05, 1.11],
+  [-450, -349, 0.05, 1.11],
+  [-500, -365, 0.05, 1.11],
+  [-550, -381, 0.05, 1.11],
+  [-600, -397, 0.05, 1.11],
+  [-450, -320, 0.05, 2],
+  [-260, -230, 0.1, 2],
+  [-260, -120, 0.1, 2],
+  [-300, -230, 0.05, 1],
+  [-260, -10, 0.1, 2],
+  [-260, 100, 0.1, 2],
+  [-260, 210, 0.1, 2],
+  [-260, 320, 0.1, 2],
+  [-260, 430, 0.1, 2],
+  [-260, 540, 0.1, 2],
+  [-260, 590, 0.1, 2],
+];
+
+const road = (x, y, s, r) => ({
+  model: 'block1.glb',
+  modelScale: s,
+  modelRotation: Math.PI / r,
+  modelYOffset: 0,
+  x, y, w: 78, h: 38, f: 0, flat: true
+});
+
 // Buildings.  Only entries with an `id` are clickable places (pin + button + info panel).
 //   f      = number of floors
 //   flat   = flat roof (otherwise a pitched roof)
 //   vrPage = file inside VR_DIR opened by "Enter VR"; use null while a page is not ready
 export const BUILDINGS = [
   {
-    id: 'engineering',
-    name: 'Faculty of Engineering (NUOL)',
+    name: 'Faculty of Engineering',
     short: 'Faculty of Eng.',
     icon: 'book',
 
@@ -99,7 +186,6 @@ export const BUILDINGS = [
   },
   
   { 
-    id:'unknownown',
     name: 'Unidentified building',
     short: '...',
     icon: 'book',
@@ -119,7 +205,6 @@ export const BUILDINGS = [
   },
 
   { 
-    id:'unknown',
     name: 'Unidentified building',
     short: '...',
     icon: 'book',
@@ -179,7 +264,6 @@ export const BUILDINGS = [
   },
 
   { 
-    id: 'department',
     name: 'Dormitory building',
     short: 'Dormitory',
     icon: 'home',
@@ -310,7 +394,7 @@ export const BUILDINGS = [
     modelRotation: Math.PI / 2,
     modelYOffset: 0,
 
-    x: -450, y: -135, w: 60, h: 30, f: 1, flat: true,
+    x: -450, y: -110, w: 60, h: 30, f: 1, flat: true,
     roof: 0xbfe3f5, wall: 0xbfe3f5
   },
   
@@ -363,7 +447,7 @@ export const BUILDINGS = [
     description: 'Road building.',
     vrPage: null,
 
-    x: -130, y: 0, w: 60, h: 30, f: 1,
+    x: -130, y: 50, w: 60, h: 30, f: 1,
     roof: '#b95a3a'
   },
 
@@ -540,495 +624,15 @@ export const BUILDINGS = [
   },
 
 
-  //Roed in side of the campus
-  {
-    modelScale: 0.12,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
+  // ---- Inner campus roads --------------------------------------------------
+  // One road piece = one short row:  [x, y, scale, rot]
+  //   x, y  = screenshot pixels (same as buildings)
+  //   scale = size of the road model (modelScale)
+  //   rot   = angle divisor: the piece is turned by Math.PI / rot
+  //           (1 = 180deg, 2 = 90deg, -2 = -90deg, 3 = 60deg ...)
+  // To add a road just add one row to ROAD_PIECES at the top of this file.
+  ...ROAD_PIECES.map(([x, y, s, r]) => road(x, y, s, r)),
 
-    model: 'block1.glb',
-
-    x: 380, y: 470, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.12,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 380, y: 580, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.12,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 380, y: 340, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.12,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 380, y: 218, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 320, y: 160, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 290, y: 110, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 3,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 260, y: 110, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2.1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 225, y: 215, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2.1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 220, y: 270, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.08,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 240, y: 60, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.08,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 190, y: 60, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 310, y: 335, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1.01,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 200, y: 333, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 115, y: 332, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 290, y: 0, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 290, y: -100, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 290, y: -170, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / -1.02,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 240, y: -190, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1.1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 240, y: -230, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1.01,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 130, y: -250, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 50, y: -250, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / -1.03,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 130, y: -181, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.07,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 130, y: -210, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / -1.01,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 23, y: -174, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.08,
-    modelRotation: Math.PI / 2.08,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: -20, y: -210, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -260, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -305, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -360, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -420, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -460, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -425, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -490, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -530, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-    x: 335, y: -590, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 335, y: -640, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 300, y: -520, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 240, y: -520, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 185, y: -520, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 130, y: -520, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 60, y: -520, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.05,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 0, y: -520, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: -15, y: -460, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: -15, y: -390, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 2,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: -15, y: -295, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.04,
-    modelRotation: Math.PI / -1.5,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 240, y: -160, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 350, y: -215, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 460, y: -215, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 570, y: -215, w: 78, h: 38, f: 0, flat: true
-  },
-
-  {
-    modelScale: 0.1,
-    modelRotation: Math.PI / 1,
-    modelYOffset: 0,
-
-    model: 'block1.glb',
-
-    x: 610, y: -215, w: 78, h: 38, f: 0, flat: true
-  },
   // Decorative buildings (no id = not clickable)
   // { x: 156, y: 205, w: 38, h: 34, f: 2, flat: true, roof: 0xd9d4c8, wall: 0xf4f1ea },
   // { x: 98,  y: 154, w: 58, h: 32, f: 2, roof: '#c8442f' },

@@ -15,6 +15,13 @@ import {
   BUILDINGS,
   MONUMENT
 } from './config.js';
+import * as CFG from './config.js';
+
+// Effect defaults. Override them by exporting EFFECTS from config.js (see config.js).
+const FX = Object.assign(
+  { night: true, fireworks: true, snow: false, ui: true, uiCorner: 'bottom-left', remember: true },
+  CFG.EFFECTS || {}
+);
 
 // Same colours and lighting as the approved demo (which used the classic three.js look).
 THREE.ColorManagement.enabled = false;
@@ -84,9 +91,20 @@ export function heightAt() { return 0; }        // the whole map sits at one fla
     const box = (w, h, d, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); return m; };
     const add = (o) => { scene.add(o); return o; };
 
+    // Effect switches (night / fireworks / snow). The last choice is remembered in the browser.
+    const FX_KEY = 'campus-effects-v1';
+    const fxState = { night: !!FX.night, fireworks: !!FX.fireworks, snow: !!FX.snow };
+    if (FX.remember) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(FX_KEY) || 'null');
+        if (saved) for (const k of ['night', 'fireworks', 'snow']) if (typeof saved[k] === 'boolean') fxState[k] = saved[k];
+      } catch (e) { /* no storage available: just use the defaults */ }
+    }
+    const cloudMats = [];
+
 /* ---------- soft fog: hide the map edges ---------- */
 scene.fog = new THREE.Fog(
-  0xcfe8f8, // สีหมอกให้เข้ากับท้องฟ้า
+  0x131b3a, // night fog colour (matches the horizon)
   70,      // เริ่มเห็นหมอก
   150      // ระยะที่หมอกกลืนวัตถุจนเกือบหมด
 );
@@ -96,20 +114,25 @@ scene.fog = new THREE.Fog(
   const sunDir = new THREE.Vector3(-0.15, 0.62, -0.77).normalize();
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
+  const skyUniforms = {
+    sunDir: { value: sunDir },
+    c0: { value: new THREE.Vector3() }, c1: { value: new THREE.Vector3() }, c2: { value: new THREE.Vector3() }, c3: { value: new THREE.Vector3() },
+    g1: { value: new THREE.Vector3() }, g2: { value: new THREE.Vector3() }, p1: { value: 10 }, p2: { value: 140 }
+  };
   const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { sunDir: { value: sunDir } },
+    uniforms: skyUniforms,
     vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: [
-      'varying vec3 vP; uniform vec3 sunDir;',
+      'varying vec3 vP; uniform vec3 sunDir; uniform vec3 c0; uniform vec3 c1; uniform vec3 c2; uniform vec3 c3;',
+      'uniform vec3 g1; uniform vec3 g2; uniform float p1; uniform float p2;',
       'void main(){',
       ' vec3 d = normalize(vP); float h = clamp(d.y, 0.0, 1.0);',
-      ' vec3 c0 = vec3(0.81, 0.91, 0.97); vec3 c1 = vec3(0.60, 0.82, 0.98); vec3 c2 = vec3(0.32, 0.62, 0.95); vec3 c3 = vec3(0.16, 0.45, 0.88);',
       ' vec3 col = mix(c0, c1, smoothstep(0.0, 0.12, h));',
       ' col = mix(col, c2, smoothstep(0.08, 0.4, h));',
       ' col = mix(col, c3, smoothstep(0.35, 0.9, h));',
       ' float s = max(dot(d, sunDir), 0.0);',
-      ' col += vec3(1.0, 1.0, 0.9) * pow(s, 10.0) * 0.18 + vec3(1.0, 1.0, 0.95) * pow(s, 140.0) * 0.6;',
+      ' col += g1 * pow(s, p1) + g2 * pow(s, p2);',
       ' gl_FragColor = vec4(col, 1.0);',
       '}'
     ].join('\n')
@@ -117,24 +140,40 @@ scene.fog = new THREE.Fog(
   sky.renderOrder = -10; sky.frustumCulled = false;
   skyGroup.add(sky);
 
-  const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(30, 48), new THREE.MeshBasicMaterial({ color: 0xffffee, fog: false, depthWrite: false }));
+  // sun (day) / moon (night): the same disc, recoloured and resized by applyTime()
+  const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(13, 48), new THREE.MeshBasicMaterial({ color: 0xeef2ff, fog: false, depthWrite: false }));
   sunDisc.position.copy(sunDir).multiplyScalar(430); sunDisc.lookAt(0, 0, 0); sunDisc.renderOrder = -9;
   skyGroup.add(sunDisc);
 
-  {
+  const halo = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gr.addColorStop(0, 'rgba(255,255,235,0.85)'); gr.addColorStop(0.35, 'rgba(255,255,220,0.25)'); gr.addColorStop(1, 'rgba(255,255,220,0)');
+    gr.addColorStop(0, 'rgba(255,255,255,0.85)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.25)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, fog: false, depthWrite: false, transparent: true }));
-    halo.scale.set(300, 300, 1); halo.position.copy(sunDir).multiplyScalar(425); halo.renderOrder = -8;
-    skyGroup.add(halo);
-  }
+    const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, fog: false, depthWrite: false, transparent: true }));
+    h.position.copy(sunDir).multiplyScalar(425); h.renderOrder = -8;
+    skyGroup.add(h);
+    return h;
+  })();
+
+  const starPts = (() => {                                             // stars (only visible at night)
+    const n = 1100, sp = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const y = 0.06 + rnd() * 0.94, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - y * y);
+      sp[i * 3] = Math.cos(a) * r * 520; sp[i * 3 + 1] = y * 520; sp[i * 3 + 2] = Math.sin(a) * r * 520;
+    }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    const pts = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xdfe8ff, size: 1.8, sizeAttenuation: false, fog: false, depthWrite: false, transparent: true, opacity: 0.85 }));
+    pts.frustumCulled = false; pts.renderOrder = -9;
+    skyGroup.add(pts);
+    return pts;
+  })();
 
   // Intensities are multiplied by PI to match the classic three.js lighting the demo used.
-  scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x4f6f2a, 0.85 * Math.PI));
-  scene.add(new THREE.AmbientLight(0xffffff, 0.2 * Math.PI));
-  const sun = new THREE.DirectionalLight(0xfff8e8, 1.05 * Math.PI);
+  const hemi = new THREE.HemisphereLight(0xcfe8ff, 0xaab4c4, 0.85 * Math.PI);
+  const amb = new THREE.AmbientLight(0xffffff, 0.2 * Math.PI);
+  const sun = new THREE.DirectionalLight(0xfff8e8, 1.05 * Math.PI);   // sunlight by day, moonlight at night
+  scene.add(hemi, amb);
   sun.position.set(-10, 40, 12);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -143,13 +182,53 @@ scene.fog = new THREE.Fog(
   sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.05;
   scene.add(sun, sun.target);
 
+  /* ---------- day / night presets: edit the numbers here to change the mood ---------- */
+  const TIME = {
+    day: {
+      sky: [[0.81, 0.91, 0.97], [0.60, 0.82, 0.98], [0.32, 0.62, 0.95], [0.16, 0.45, 0.88]],   // horizon -> zenith
+      g1: [0.18, 0.18, 0.162], p1: 10, g2: [0.6, 0.6, 0.57], p2: 140,                           // sun glow (wide, tight)
+      fog: 0xcfe8f8,
+      hemi: [0xcfe8ff, 0xaab4c4, 0.85], amb: [0xffffff, 0.2], sun: [0xfff8e8, 1.05],            // [colour(s), intensity]
+      disc: [0xffffee, 30 / 13], halo: [0xffffeb, 300, 0.85], stars: false, clouds: [0xf4f9ff, 0xffffff]
+    },
+    night: {
+      sky: [[0.075, 0.105, 0.23], [0.04, 0.065, 0.17], [0.02, 0.035, 0.11], [0.008, 0.015, 0.06]],
+      g1: [0.07, 0.087, 0.14], p1: 12, g2: [0.72, 0.76, 0.8], p2: 300,                          // moon glow
+      fog: 0x131b3a,
+      hemi: [0x6f86c8, 0x1c2438, 0.45], amb: [0x8090c0, 0.14], sun: [0xaec4ff, 0.45],
+      disc: [0xeef2ff, 1], halo: [0xbcd0ff, 150, 0.65], stars: true, clouds: [0x1a2240, 0x232d52]
+    }
+  };
+  function applyTime(night) {
+    const T = night ? TIME.night : TIME.day;
+    ['c0', 'c1', 'c2', 'c3'].forEach((k, i) => skyUniforms[k].value.set(T.sky[i][0], T.sky[i][1], T.sky[i][2]));
+    skyUniforms.g1.value.set(T.g1[0], T.g1[1], T.g1[2]); skyUniforms.g2.value.set(T.g2[0], T.g2[1], T.g2[2]);
+    skyUniforms.p1.value = T.p1; skyUniforms.p2.value = T.p2;
+    scene.fog.color.setHex(T.fog);
+    hemi.color.setHex(T.hemi[0]); hemi.groundColor.setHex(T.hemi[1]); hemi.intensity = T.hemi[2] * Math.PI;
+    amb.color.setHex(T.amb[0]); amb.intensity = T.amb[1] * Math.PI;
+    sun.color.setHex(T.sun[0]); sun.intensity = T.sun[1] * Math.PI;
+    sunDisc.material.color.setHex(T.disc[0]); sunDisc.scale.setScalar(T.disc[1]);
+    halo.material.color.setHex(T.halo[0]); halo.scale.set(T.halo[1], T.halo[1], 1); halo.material.opacity = T.halo[2];
+    starPts.visible = T.stars;
+    if (cloudMats.length >= 2) { cloudMats[0].color.setHex(T.clouds[0]); cloudMats[1].color.setHex(T.clouds[1]); }
+  }
+  applyTime(fxState.night);
+
   /* ---------- terrain and lake ---------- */
   {
     const g = new THREE.PlaneGeometry(300, 300, 260, 176);
     g.rotateX(-Math.PI / 2); g.translate(0, 0, -10);
     const pos = g.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color();
-    const lime = new THREE.Color(0xb7ab6c), green = new THREE.Color(0x8a9a5e), deep = new THREE.Color(0x6f7e4c),
-      rock = new THREE.Color(0x8a8878), sand = new THREE.Color(0xd8c48e), wet = new THREE.Color(0xc2ab79);
+    // Snow ground. These values are darker than the snow looks on screen because the scene
+    // lights add up to roughly 2x brightness (so 0x807a78 renders as near-white and shadows
+    // stay visible). Lighter values = flatter, brighter snow; darker = greyer, more contrast.
+    const lime = new THREE.Color(0x807a78),   // fresh snow (main colour)
+      green = new THREE.Color(0x767577),      // slightly shaded patches
+      deep = new THREE.Color(0x6a6b71),       // blue-ish drifts
+      rock = new THREE.Color(0x5f6269),       // (only used if hills come back)
+      sand = new THREE.Color(0x807a78),       // lake-shore tint -> snow too
+      wet = new THREE.Color(0x6c6e73);        // low ground -> icy
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
@@ -967,7 +1046,8 @@ scene.fog = new THREE.Fog(
 
   const clouds = [];
   {
-    const m1 = new THREE.MeshBasicMaterial({ color: 0xf4f9ff, fog: false }), m2 = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
+    const m1 = new THREE.MeshBasicMaterial({ color: 0x1a2240, fog: false }), m2 = new THREE.MeshBasicMaterial({ color: 0x232d52, fog: false });
+    cloudMats.push(m1, m2);
     const blobs = [[0, 0, 0, 1, 0], [1.15, -0.1, 0.1, 0.8, 0], [-1.15, -0.15, 0, 0.75, 0], [0.5, 0.55, 0, 0.75, 1], [-0.4, 0.5, 0.1, 0.6, 1]];
     const geo = new THREE.SphereGeometry(1, 14, 10);
     [[-70, 44, -120, 14], [-30, 56, -135, 11], [20, 40, -125, 12], [62, 52, -130, 16], [105, 42, -115, 13], [-105, 38, -100, 12], [0, 66, -140, 15], [40, 30, -100, 8], [-52, 30, -105, 9]].forEach((s) => {
@@ -994,6 +1074,213 @@ scene.fog = new THREE.Fog(
     for (let j = 0; j < 4; j++) cars.push({ m: makeCar(cols[(j + 3) % cols.length]), road: 'B', s: -45 + j * 24 + rnd() * 8, v: (j % 2 ? 1 : -1) * (4.5 + rnd() * 3), lane: j % 2 ? 0.4 : -0.4 });
   }
 
+  /* ---------- fireworks: rockets rise, burst in the sky, sparks fade ---------- */
+  const fireworks = { enabled: fxState.fireworks, update() {}, setEnabled() {} };
+  {
+    // ---- look & feel: change these numbers ----
+    const LAUNCH_EVERY = [0.5, 1.6];      // seconds between launches (min, max)
+    const SALVO_CHANCE = 0.25;            // chance a launch fires 3 rockets together
+    const BURST_HEIGHT = [16, 28];        // how high the shells explode (kept low so they stay inside the view)
+    const BURST_SPEED = 22;               // bigger = bigger bursts
+    const FLASH = 2500;                   // how strongly a burst lights the ground/buildings
+    const SPARK_SIZE = 1.6;               // size of one spark (world units)
+    const HEAD_SIZE = 5;                  // size of the glowing rocket head / burst core
+    const SPREAD = 24;                    // rockets launch within this distance of the spot the camera is looking at
+    const PALETTE = [0xff3b3b, 0xffb42e, 0xffe36b, 0x4dffb0, 0x4db8ff, 0xc45cff, 0xff6fd0, 0xffffff];
+
+    // soft round sprite (bright centre, transparent edge)
+    const tc = document.createElement('canvas'); tc.width = tc.height = 64;
+    const tg = tc.getContext('2d'), tgr = tg.createRadialGradient(32, 32, 0, 32, 32, 32);
+    tgr.addColorStop(0, 'rgba(255,255,255,1)'); tgr.addColorStop(0.3, 'rgba(255,255,255,0.7)'); tgr.addColorStop(1, 'rgba(255,255,255,0)');
+    tg.fillStyle = tgr; tg.fillRect(0, 0, 64, 64);
+    const sprite = new THREE.CanvasTexture(tc);
+
+    // A pool = one THREE.Points object holding many particles (plain PointsMaterial, no custom shader).
+    function makePool(MAX, size) {
+      const P = new Float32Array(MAX * 3), C = new Float32Array(MAX * 3), BC = new Float32Array(MAX * 3), V = new Float32Array(MAX * 3);
+      const AGE = new Float32Array(MAX), LIFE = new Float32Array(MAX), DRAG = new Float32Array(MAX), GRAV = new Float32Array(MAX), TWK = new Float32Array(MAX);
+      for (let i = 0; i < MAX; i++) P[i * 3 + 1] = -1000;
+      const geo = new THREE.BufferGeometry();
+      const aPos = new THREE.BufferAttribute(P, 3), aCol = new THREE.BufferAttribute(C, 3);
+      aPos.setUsage(THREE.DynamicDrawUsage); aCol.setUsage(THREE.DynamicDrawUsage);
+      geo.setAttribute('position', aPos); geo.setAttribute('color', aCol);
+      const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+        map: sprite, size, sizeAttenuation: true, vertexColors: true, transparent: true,
+        depthWrite: false, blending: THREE.AdditiveBlending, fog: false
+      }));
+      pts.frustumCulled = false; pts.visible = fxState.fireworks; scene.add(pts);
+      let head = 0;
+      return {
+        pts,
+        clear() { LIFE.fill(0); C.fill(0); for (let i = 0; i < MAX; i++) P[i * 3 + 1] = -1000; aPos.needsUpdate = true; aCol.needsUpdate = true; },
+        spawn(x, y, z, vx, vy, vz, r, g, b, life, drag, grav, twk) {
+          const i = head; head = (head + 1) % MAX; const k = i * 3;
+          P[k] = x; P[k + 1] = y; P[k + 2] = z; V[k] = vx; V[k + 1] = vy; V[k + 2] = vz;
+          BC[k] = r; BC[k + 1] = g; BC[k + 2] = b; C[k] = r; C[k + 1] = g; C[k + 2] = b;
+          AGE[i] = 0; LIFE[i] = life; DRAG[i] = drag; GRAV[i] = grav; TWK[i] = twk;
+        },
+        step(dt, time) {
+          for (let i = 0; i < MAX; i++) {
+            const L = LIFE[i]; if (L <= 0) continue;
+            const k = i * 3, age = AGE[i] + dt;
+            if (age >= L) { LIFE[i] = 0; C[k] = C[k + 1] = C[k + 2] = 0; continue; }
+            AGE[i] = age; const damp = Math.exp(-DRAG[i] * dt);
+            V[k] *= damp; V[k + 1] = V[k + 1] * damp - GRAV[i] * dt; V[k + 2] *= damp;
+            P[k] += V[k] * dt; P[k + 1] += V[k + 1] * dt; P[k + 2] += V[k + 2] * dt;
+            let a = 1 - age / L; a *= a;                                          // additive blending: fade = darken
+            if (TWK[i]) a *= 0.55 + 0.45 * Math.sin(time * 35 + i);              // twinkle
+            a *= 1.4;
+            C[k] = BC[k] * a; C[k + 1] = BC[k + 1] * a; C[k + 2] = BC[k + 2] * a;
+          }
+          aPos.needsUpdate = true; aCol.needsUpdate = true;
+        }
+      };
+    }
+    const small = makePool(6500, SPARK_SIZE), big = makePool(800, HEAD_SIZE);
+    // size >= 2 -> goes to the "big" pool (rocket head, burst core), otherwise small sparks
+    const spawn = (x, y, z, vx, vy, vz, r, g, b, life, size, drag, grav, twk) =>
+      (size >= 2 ? big : small).spawn(x, y, z, vx, vy, vz, r, g, b, life, drag, grav, twk);
+
+    // a few point lights, reused, that flash in the colour of each burst
+    const flashes = [];
+    for (let i = 0; i < 3; i++) { const l = new THREE.PointLight(0xffffff, 0, 0, 2); l.position.set(0, 40, 0); scene.add(l); flashes.push({ l, k: 0 }); }
+    let flashI = 0, bursts = 0;
+
+    const sphereDir = () => { const z = rnd() * 2 - 1, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - z * z); return [Math.cos(a) * r, z, Math.sin(a) * r]; };
+    const mixWhite = (c, t) => [c.r + (1 - c.r) * t, c.g + (1 - c.g) * t, c.b + (1 - c.b) * t];
+
+    function explode(x, y, z) {
+      if (bursts++ === 0) console.log('[FIREWORKS] first burst at', x.toFixed(1), y.toFixed(1), z.toFixed(1));
+      const c1 = new THREE.Color(PALETTE[(rnd() * PALETTE.length) | 0]), c2 = new THREE.Color(PALETTE[(rnd() * PALETTE.length) | 0]);
+      const f = flashes[flashI++ % flashes.length]; f.l.position.set(x, y, z); f.l.color.copy(c1); f.k = 1;
+      spawn(x, y, z, 0, 0, 0, 1, 1, 1, 0.3, 7, 0, 0, 0);                        // bright core flash
+      const type = rnd(), SP = BURST_SPEED;
+      if (type < 0.4) {                                                          // peony: round ball
+        for (let i = 0; i < 300; i++) {
+          const d = sphereDir(), s = SP * (0.72 + rnd() * 0.28), col = mixWhite(rnd() < 0.35 ? c2 : c1, rnd() * 0.35);
+          spawn(x, y, z, d[0] * s, d[1] * s, d[2] * s, col[0], col[1], col[2], 1.7 + rnd() * 0.8, 1, 1.7, 4, rnd() < 0.4 ? 1 : 0);
+        }
+      } else if (type < 0.65) {                                                  // ring: tilted circle
+        const n = sphereDir(), u = [-n[2], 0, n[0]], ul = Math.hypot(u[0], u[2]) || 1;
+        u[0] /= ul; u[2] /= ul;
+        const w = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]];
+        for (let i = 0; i < 150; i++) {
+          const a = (i / 150) * Math.PI * 2, s = SP * 1.05, ca = Math.cos(a) * s, sa = Math.sin(a) * s, col = mixWhite(c1, 0.2);
+          spawn(x, y, z, u[0] * ca + w[0] * sa, u[1] * ca + w[1] * sa, u[2] * ca + w[2] * sa, col[0], col[1], col[2], 1.8 + rnd() * 0.3, 1, 1.8, 3, 0);
+        }
+      } else if (type < 0.85) {                                                  // willow: long golden drooping trails
+        for (let i = 0; i < 230; i++) {
+          const d = sphereDir(), s = SP * (0.5 + rnd() * 0.4);
+          spawn(x, y, z, d[0] * s, d[1] * s, d[2] * s, 1, 0.74, 0.3, 3.2 + rnd() * 1.0, 1, 1.1, 6, 1);
+        }
+      } else {                                                                   // double: ball inside a ball
+        for (let i = 0; i < 170; i++) { const d = sphereDir(), s = SP * 1.1, col = mixWhite(c1, 0.15); spawn(x, y, z, d[0] * s, d[1] * s, d[2] * s, col[0], col[1], col[2], 1.9 + rnd() * 0.5, 1, 1.8, 4, 0); }
+        for (let i = 0; i < 120; i++) { const d = sphereDir(), s = SP * 0.55, col = mixWhite(c2, 0.4); spawn(x, y, z, d[0] * s, d[1] * s, d[2] * s, col[0], col[1], col[2], 1.6 + rnd() * 0.5, 1, 1.8, 4, 1); }
+      }
+    }
+
+    const shells = [];
+    // Fireworks follow the camera: they are launched around the ground spot the camera looks at
+    // (pulled a little toward the camera) so the bursts always land inside the screen.
+    const _dir = new THREE.Vector3(), focus = { x: -5, z: 0 };
+    const updateFocus = (camera) => {
+      camera.getWorldDirection(_dir);
+      const cp = camera.position, t = Math.min(_dir.y < -0.05 ? -cp.y / _dir.y : 60, 160);
+      const gx = cp.x + _dir.x * t, gz = cp.z + _dir.z * t;
+      focus.x = gx + (cp.x - gx) * 0.25; focus.z = gz + (cp.z - gz) * 0.25;
+    };
+    const launch = () => {
+      const H = BURST_HEIGHT[0] + rnd() * (BURST_HEIGHT[1] - BURST_HEIGHT[0]), a = 10;
+      shells.push({
+        x: focus.x + (rnd() - 0.5) * 2 * SPREAD, y: 1, z: focus.z + (rnd() - 0.5) * 2 * SPREAD,
+        vx: (rnd() - 0.5) * 2, vz: (rnd() - 0.5) * 2, vy: Math.sqrt(2 * a * H), a, acc: 0
+      });
+    };
+    let nextLaunch = 0.4;
+
+    fireworks.update = (dt, time, camera) => {
+      if (!fireworks.enabled) return;
+      dt = Math.min(dt, 0.05);
+      if (camera) updateFocus(camera);
+      nextLaunch -= dt;
+      if (nextLaunch <= 0) {
+        const n = rnd() < SALVO_CHANCE ? 3 : 1;
+        for (let i = 0; i < n; i++) launch();
+        nextLaunch = LAUNCH_EVERY[0] + rnd() * (LAUNCH_EVERY[1] - LAUNCH_EVERY[0]);
+      }
+      for (let s = shells.length - 1; s >= 0; s--) {
+        const sh = shells[s];
+        sh.vy -= sh.a * dt; sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.z += sh.vz * dt;
+        spawn(sh.x, sh.y, sh.z, 0, 0, 0, 1, 0.95, 0.8, 0.14, 5, 0, 0, 0);          // glowing rocket head
+        sh.acc += dt * 160;
+        while (sh.acc >= 1) {                                                       // long spark trail = the "line" behind the rocket
+          sh.acc -= 1;
+          spawn(sh.x, sh.y, sh.z, (rnd() - 0.5) * 1.2, -0.5 - rnd() * 1.5, (rnd() - 0.5) * 1.2, 1, 0.65, 0.28, 0.9 + rnd() * 0.6, 1, 1.2, 1.5, 0);
+        }
+        if (sh.vy <= 1) { explode(sh.x, sh.y, sh.z); shells.splice(s, 1); }
+      }
+      small.step(dt, time); big.step(dt, time);
+      for (const f of flashes) { f.k *= Math.exp(-dt * 2.5); f.l.intensity = FLASH * f.k * f.k; }
+    };
+    fireworks.setEnabled = (on) => {
+      fireworks.enabled = on; small.pts.visible = big.pts.visible = on;
+      if (!on) { shells.length = 0; small.clear(); big.clear(); for (const f of flashes) { f.k = 0; f.l.intensity = 0; } }
+      else nextLaunch = 0.3;
+    };
+  }
+
+  /* ---------- falling snow: soft, fluffy flakes in two depth layers (toggle with effects.setSnow) ---------- */
+  const snowfall = { enabled: fxState.snow, layers: [], update() {}, setEnabled() {} };
+  {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    const flakeTex = new THREE.CanvasTexture(c);
+
+    const SNOW = { w: 70, h: 40, d: 70 };    // size of the snow box that follows the camera
+    const defs = [                           // tweak these to change the look
+      { n: 1400, size: 0.22, fall: 1.1, sway: 0.35, opacity: 0.85 },   // small, far flakes
+      { n: 500,  size: 0.55, fall: 1.7, sway: 0.6,  opacity: 0.9 }     // big fluffy flakes
+    ];
+    for (const d of defs) {
+      const pos = new Float32Array(d.n * 3), seed = new Float32Array(d.n), spd = new Float32Array(d.n);
+      for (let i = 0; i < d.n; i++) {
+        pos[i * 3] = (rnd() - 0.5) * SNOW.w;
+        pos[i * 3 + 1] = rnd() * SNOW.h;
+        pos[i * 3 + 2] = (rnd() - 0.5) * SNOW.d - 10;
+        seed[i] = rnd() * 6.283; spd[i] = 0.7 + rnd() * 0.6;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+        map: flakeTex, size: d.size, sizeAttenuation: true, transparent: true,
+        opacity: d.opacity, depthWrite: false, color: 0xffffff
+      }));
+      pts.frustumCulled = false; pts.visible = snowfall.enabled;
+      scene.add(pts);
+      snowfall.layers.push({ pts, pos, seed, spd, d });
+    }
+    snowfall.update = (dt, time, camera) => {
+      if (!snowfall.enabled) return;
+      dt = Math.min(dt, 0.05);
+      const cam = camera.position;
+      for (const { pts, pos, seed, spd, d } of snowfall.layers) {
+        for (let i = 0; i < spd.length; i++) {
+          const k = i * 3;
+          pos[k + 1] -= d.fall * spd[i] * dt;                                  // fall
+          pos[k] += Math.sin(time * 0.7 + seed[i]) * d.sway * dt;              // sway left/right
+          pos[k + 2] += Math.cos(time * 0.5 + seed[i]) * d.sway * 0.6 * dt;
+          if (pos[k + 1] < 0) pos[k + 1] += SNOW.h;                            // reached ground -> back to the top
+          if (pos[k] < cam.x - SNOW.w / 2) pos[k] += SNOW.w; else if (pos[k] > cam.x + SNOW.w / 2) pos[k] -= SNOW.w;
+          if (pos[k + 2] < cam.z - SNOW.d / 2) pos[k + 2] += SNOW.d; else if (pos[k + 2] > cam.z + SNOW.d / 2) pos[k + 2] -= SNOW.d;
+        }
+        pts.geometry.attributes.position.needsUpdate = true;
+      }
+    };
+    snowfall.setEnabled = (on) => { snowfall.enabled = on; for (const L of snowfall.layers) L.pts.visible = on; };
+  }
+
   /* ---------- per-frame animation ---------- */
   function update(dt, time, camera) {
     skyGroup.position.copy(camera.position);
@@ -1009,9 +1296,54 @@ scene.fog = new THREE.Fog(
       }
       c.m.rotation.y = -Math.atan2(fz, fx);
     }
+    fireworks.update(dt, time, camera);
+    snowfall.update(dt, time, camera);
     boat.position.y = LAKE.waterY + Math.sin(time * 1.3) * 0.05; boat.rotation.z = Math.sin(time * 1.1) * 0.05; boat.rotation.y = 0.5 + Math.sin(time * 0.2) * 0.2;
     clouds.forEach((c, i) => { c.position.x += dt * (0.5 + (i % 3) * 0.25); if (c.position.x > 140) c.position.x = -140; });
   }
 
-  return { places, buildingMeshes, labels, update };
+  /* ---------- effects switches: night / fireworks / snow ---------- */
+  applyTime(fxState.night);        // again, now that the clouds exist
+  const listeners = [];
+  const changed = () => {
+    if (FX.remember) { try { localStorage.setItem(FX_KEY, JSON.stringify(fxState)); } catch (e) { /* ignore */ } }
+    listeners.forEach((fn) => fn({ ...fxState }));
+  };
+  const effects = {
+    get state() { return { ...fxState }; },
+    setNight(on) { fxState.night = !!on; applyTime(fxState.night); changed(); },
+    setFireworks(on) { fxState.fireworks = !!on; fireworks.setEnabled(fxState.fireworks); changed(); },
+    setSnow(on) { fxState.snow = !!on; snowfall.setEnabled(fxState.snow); changed(); },
+    toggleNight() { this.setNight(!fxState.night); },
+    toggleFireworks() { this.setFireworks(!fxState.fireworks); },
+    toggleSnow() { this.setSnow(!fxState.snow); },
+    onChange(fn) { listeners.push(fn); }
+  };
+
+  if (FX.ui && typeof document !== 'undefined') {
+    const pos = { 'bottom-left': 'bottom:16px;left:16px', 'bottom-right': 'bottom:16px;right:16px', 'top-left': 'top:16px;left:16px', 'top-right': 'top:16px;right:16px' }[FX.uiCorner] || 'bottom:16px;left:16px';
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;z-index:30;display:flex;gap:8px;font:600 13px system-ui,sans-serif;' + pos;
+    const mk = (onClick) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.style.cssText = 'cursor:pointer;border:1px solid rgba(255,255,255,0.35);border-radius:999px;padding:8px 14px;backdrop-filter:blur(6px);font:inherit;transition:background .15s,color .15s';
+      b.addEventListener('pointerdown', (e) => e.stopPropagation());     // don't start a camera drag
+      b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+      bar.appendChild(b); return b;
+    };
+    const style = (b, on) => { b.style.background = on ? 'rgba(255,255,255,0.92)' : 'rgba(20,28,50,0.72)'; b.style.color = on ? '#16203a' : '#fff'; b.setAttribute('aria-pressed', String(!!on)); };
+    const bTime = mk(() => effects.toggleNight());
+    const bFire = mk(() => effects.toggleFireworks());
+    const bSnow = mk(() => effects.toggleSnow());
+    const paint = (st) => {
+      bTime.textContent = st.night ? '\u{1F319} Night' : '\u2600\uFE0F Day'; style(bTime, !st.night);
+      bFire.textContent = '\u{1F386} Fireworks'; style(bFire, st.fireworks);
+      bSnow.textContent = '\u2744\uFE0F Snow'; style(bSnow, st.snow);
+    };
+    effects.onChange(paint); paint(fxState);
+    document.body.appendChild(bar);
+  }
+
+  return { places, buildingMeshes, labels, update, effects };
 }
