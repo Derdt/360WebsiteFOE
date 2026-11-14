@@ -245,11 +245,11 @@ export const BUILDINGS = [
 
   {
     id: 'jica',
-    name: 'JICA ITSD',
-    short: 'JICA ITSD',
+    name: 'CEIT',
+    short: 'CEIT',
     icon: 'desk',
 
-    description: 'JICA ITSD building on campus.',
+    description: 'CEIT building on campus.',
     vrPage: 'CEIT_Building.html',
 
     model: 'CEIT_BUILDING.glb',
