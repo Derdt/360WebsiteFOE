@@ -16,11 +16,37 @@ export const ROAD_RIGHT = { from: [780, -300], to: [780, 900], width: 2.6 }; // 
 export const ROAD_BOTTOM = {y: 690, width: 1.8 };                  // road along the bottom
 export const LAKE = { x: -21, z: 25, rx: 12, rz: 9, waterY: -0.85 };
 
+// Effects shown when the page opens (visitors can still switch them with the buttons on screen).
+//   night / fireworks / weather : true = on, false = off   (weather = what falls with the ground theme: snow, petals, leaves, dust)
+//   theme    : ground when the page opens: 'grass' | 'spring' | 'summer' | 'autumn' | 'winter' | 'desert'
+//              (visitors change it with the hamburger button; add your own themes at the top of world.js)
+//   ui       : show the on-screen buttons
+//   uiCorner : 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
+//   remember : keep the visitor's last choice in the browser (set false to always start from these values)
+export const EFFECTS = { night: true, fireworks: true, weather: false, theme: 'winter', ui: true, uiCorner: 'bottom-left', remember: true };
+
+// Real-world GPS -> position on this map  (the "My location" button, bottom-right of the page).
+//   refs : known real points. Each is a GPS position plus the spot on the map where it is:
+//            model: 'File.glb'  = the centre of that building's model (first match in BUILDINGS)
+//            or give map pixels directly:  x: 123, y: 456
+//          1 ref   -> the position is exact at that point; the size and direction come from the two estimates below
+//          2+ refs -> size and direction are worked out from the points themselves (more points = more accurate)
+//   Get a point's GPS in Google Maps: press and hold on the spot, then copy the two numbers shown.
+//   Try it without walking: open  campus.html?gpstest  and click on the map to place yourself.
+export const GPS = {
+  enabled: true,
+  refs: [
+    { lat: 17.939896024230634, lng: 102.62491889372168, model: 'Road_building.glb' },
+    // { lat: 0, lng: 0, model: 'EN.glb' },          // <- add a 2nd point here to make positions accurate
+  ],
+  metersPerPixel: 0.5,   // only used while there is ONE ref: real metres per map pixel (an estimate!)
+  rotationDeg: 0,        // only used while there is ONE ref: 0 = north is up on the map
+  defaultName: 'You'     // name on the marker (visitors are asked for their own name)
+};
+
 // ---------------------------------------------------------------------------
 // Inner campus road pieces (block1.glb).  One row per piece: [x, y, scale, rot]
 //   x, y  = screenshot pixels,  scale = modelScale,  rot = Math.PI / rot
-
-export const EFFECTS = { night: true, fireworks: true, snow: false, ui: true, uiCorner: 'bottom-left', remember: true };
 // ---------------------------------------------------------------------------
 const ROAD_PIECES = [
   [380, 470, 0.12, 2],
@@ -108,11 +134,10 @@ const road = (x, y, s, r) => ({
 //   f      = number of floors
 //   flat   = flat roof (otherwise a pitched roof)
 //   vrPage = file inside VR_DIR opened by "Enter VR"; use null while a page is not ready
+//   pinHeight = height of THIS building's pin icon above its roof (3D units, one floor is about 0.6):
+//               0 = default,  3 = higher,  -0.5 = lower.  Only buildings with an `id` have a pin.
 export const BUILDINGS = [
   {
-    name: 'Faculty of Engineering',
-    short: 'Faculty of Eng.',
-    icon: 'book',
 
     description: 'Faculty of Engineering, National University of Laos.',
     vrPage: 'engineering.html',
@@ -140,6 +165,7 @@ export const BUILDINGS = [
     name: "Electronic", 
     short: "EN",
     icon: 'cap',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     description: 'Dept of Electronic and Telecommunications (EN) building.',
     vrPage: 'EN_Building.html',
@@ -165,6 +191,7 @@ export const BUILDINGS = [
     name: "Electronic and Telecommunications", 
     short: "EN Annex",
     icon: 'cap',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     description: 'Dept of Electronic and Telecommunications (EN) building.',
     vrPage: null,
@@ -185,10 +212,7 @@ export const BUILDINGS = [
     roof: '#b83a2e'
   },
   
-  { 
-    name: 'Unidentified building',
-    short: '...',
-    icon: 'book',
+  {
 
     description: 'Not yet matched to a real building — shown as a placeholder block until confirmed.',
     vrPage: null,
@@ -204,10 +228,7 @@ export const BUILDINGS = [
     roof: 0xbfe3f5, wall: 0xbfe3f5
   },
 
-  { 
-    name: 'Unidentified building',
-    short: '...',
-    icon: 'book',
+  {
 
     description: 'Not yet matched to a real building — shown as a placeholder block until confirmed.',
     vrPage: null,
@@ -228,6 +249,7 @@ export const BUILDINGS = [
     name: 'Academie building',
     short: 'Academie',
     icon: 'star',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     description: 'Academie building — position/model not yet confirmed, shown as a placeholder block.',
     vrPage: null,
@@ -248,6 +270,7 @@ export const BUILDINGS = [
     name: 'CEIT',
     short: 'CEIT',
     icon: 'desk',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     description: 'CEIT building on campus.',
     vrPage: 'CEIT_Building.html',
@@ -286,6 +309,7 @@ export const BUILDINGS = [
     name: 'Parking road',
     short: 'Parking',
     icon: 'book',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     model: 'Parking.glb',
 
@@ -305,6 +329,7 @@ export const BUILDINGS = [
     name: 'Field of football',
     short: 'Football',
     icon: 'book',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     model: 'Football.glb',
 
@@ -324,6 +349,7 @@ export const BUILDINGS = [
     name: 'Field of basketball',
     short: 'Basketball',
     icon: 'book',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     model: 'Basketball.glb',
 
@@ -343,6 +369,7 @@ export const BUILDINGS = [
     name: 'Electronics Library',
     short: 'Library',
     icon: 'book',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     description: 'Electronics Library building — position/model not yet confirmed, shown as a placeholder block.',
     vrPage: 'Centrual_Library.html',
@@ -363,6 +390,7 @@ export const BUILDINGS = [
     name: 'Center for Engineering',
     short: 'Engineering',
     icon: 'book',
+    pinHeight: -4.5,        // pin icon height: + higher, - lower
 
     description: 'Center for Engineering building — position/model not yet confirmed, shown as a placeholder block.',
     vrPage: 'TheCircleOne.html',
@@ -383,6 +411,7 @@ export const BUILDINGS = [
     name: 'Faculty Building',
     short: 'Faculty',
     icon: 'book',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     description: 'Faculty Building — position/model not yet confirmed, shown as a placeholder block.',
     vrPage: 'KanaBorDee.html',
@@ -399,8 +428,6 @@ export const BUILDINGS = [
   },
   
   { 
-    // no id on purpose: name-only label, not clickable
-    name: 'Chemical',
 
     model: 'Chemical_update.glb',
 
@@ -415,9 +442,7 @@ export const BUILDINGS = [
     roof: '#b95a3a'
   },
 
-  { 
-    // no id on purpose: name-only label, not clickable
-    name: 'Logistics',
+  {
 
     model: 'logistics.glb',
 
@@ -435,8 +460,6 @@ export const BUILDINGS = [
   
 
   { 
-    // no id on purpose: name-only label, not clickable
-    name: 'Road building',
 
     model: 'Road_building.glb',
 
@@ -453,11 +476,7 @@ export const BUILDINGS = [
 
   
 
-  { 
-    name: 'Department of Electrical Engineering',
-
-    description: 'Department of Electrical Engineering.',
-    vrPage: null,
+  {
 
     modelScale: 0.21,
     modelRotation: 0,
@@ -471,12 +490,7 @@ export const BUILDINGS = [
     wall: 0xdcd9d0
   },
 
-  { 
-    // no id on purpose: name-only label, not clickable
-    name: 'Electrical Engineering (Annex)',
-
-    description: 'Department of Electrical Engineering.',
-    vrPage: null,
+  {
 
     modelScale: 0.12,
     modelRotation: 0,
@@ -495,6 +509,7 @@ export const BUILDINGS = [
     name: 'Mechanical Engineering LAB',
     short: 'Mech Lab',
     icon: 'cap',
+    pinHeight: 0,        // pin icon height: + higher, - lower
 
     description: 'Mechanical Engineering laboratory building.',
     vrPage: null,
@@ -511,9 +526,7 @@ export const BUILDINGS = [
     wall: 0xdcd9d0
   },
 
-  { 
-    // no id on purpose: name-only label, not clickable
-    name: 'Sathabun Phutthana',
+  {
 
     description: 'Identity not fully confirmed — named after its model file.',
     vrPage: null,
@@ -531,8 +544,6 @@ export const BUILDINGS = [
   },
 
   { 
-    // no id on purpose: name-only label, not clickable
-    name: 'K-Lab',
 
     description: 'Identity not fully confirmed — named after its model file.',
     vrPage: null,
@@ -547,9 +558,7 @@ export const BUILDINGS = [
 
   },
 
-  { 
-    // no id on purpose: name-only label, not clickable
-    name: '?',
+  {
 
     description: 'Identity not fully confirmed — named after its model file.',
     vrPage: null,
@@ -566,9 +575,7 @@ export const BUILDINGS = [
     wall: 0xdcd9d0
   },
 
-  { 
-    // no id on purpose: name-only label, not clickable
-    name: '?',
+  {
 
     description: 'Identity not fully confirmed — named after its model file.',
     vrPage: null,
@@ -586,8 +593,6 @@ export const BUILDINGS = [
   },
 
   { 
-    // no id on purpose: name-only label, not clickable
-    name: '?',
 
     description: 'Identity not fully confirmed — named after its model file.',
     vrPage: null,
@@ -604,9 +609,7 @@ export const BUILDINGS = [
     wall: 0xdcd9d0
   },
 
-  { 
-    // no id on purpose: name-only label, not clickable
-    name: '?',
+  {
 
     description: 'Identity not fully confirmed — named after its model file.',
     vrPage: null,

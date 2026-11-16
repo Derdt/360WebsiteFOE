@@ -1,14 +1,14 @@
 // ---------------------------------------------------------------------------
-//  Campus viewer: renderer, camera controls, map pins, hover tooltip, info panel.
+//  Campus viewer: renderer, camera controls, map pins (with hover/click menu), hover tooltip.
 //  Loaded by campus.html.
 // ---------------------------------------------------------------------------
 import * as THREE from 'three';
 import { createWorld } from './world.js';
-import { VR_DIR } from './config.js';
+import { VR_DIR, BUILDINGS, MAP_SCALE, MAP_CENTER, GPS } from './config.js';
+import { createGeoMapper } from './gps-map.js';
 
 const $ = (id) => document.getElementById(id);
-const stage = $('stage'), pinLayer = $('pins'), chipBar = $('chips'), panel = $('infoPanel');
-const titleEl = $('buildingTitle'), descEl = $('buildingDesc'), enterVR = $('enterVR'), vrNote = $('vrNote');
+const stage = $('stage'), pinLayer = $('pins');
 const tooltip = $('tooltip'), hint = $('hint'), fallback = $('fallback');
 
 function fail(message, err) {
@@ -66,7 +66,6 @@ function start() {
     .pin.explored .drop { position: relative; box-shadow: 0 0 0 2px #2ecc71 inset; }
     .pin.explored .drop::after { content: ''; position: absolute; top: -2px; right: -2px; width: 7px; height: 7px;
       border-radius: 50%; background: #2ecc71; border: 1px solid rgba(0,0,0,0.4); }
-    .chip.explored { box-shadow: inset 0 0 0 2px #2ecc71; }
   `;
   document.head.appendChild(extraCSS);
 
@@ -80,29 +79,61 @@ function start() {
     explored.add(id);
     try { localStorage.setItem(EXPLORED_KEY, JSON.stringify([...explored])); } catch (e) { /* ignore */ }
     const p = places.find((q) => q.id === id);
-    if (p) { p.el.classList.add('explored'); p.chip.classList.add('explored'); }
+    if (p) p.el.classList.add('explored');
   }
 
-  /* ---------- pins and chips ---------- */
+  /* ---------- pins: each pin opens a small menu (on hover with a mouse, or on click / tap) ---------- */
+  let menuOpen = null;                       // the place whose menu is held open by a click / tap
+  let hoverPin = null, lastHl = null;        // pin under the mouse; outline currently showing
+  // Shows the building's outline for: the open menu, else the hovered pin, else the hovered building.
+  function updateHighlight() {
+    const id = menuOpen ? menuOpen.id : (hoverPin || hover);
+    if (id !== lastHl) { lastHl = id; world.setHighlight(id); }
+  }
+  function openMenu(p) {
+    if (menuOpen && menuOpen !== p) { menuOpen.el.classList.remove('menu-open'); menuOpen.el.setAttribute('aria-expanded', 'false'); }
+    menuOpen = p || null;
+    if (p) { p.el.classList.add('menu-open'); p.el.setAttribute('aria-expanded', 'true'); }
+    updateHighlight();
+  }
   places.forEach((p) => {
     const el = document.createElement('div');
     el.className = 'pin' + (p.main ? ' main' : '');
     el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-label', p.name);
+    el.setAttribute('aria-haspopup', 'menu'); el.setAttribute('aria-expanded', 'false');
     el.innerHTML = '<span class="bob"><span class="drop">' + (ICONS[p.icon] || ICONS.home) + '</span><span class="tag"></span></span>';
     const tagEl = el.querySelector('.tag');
     tagEl.textContent = p.short;
     tagEl.style.opacity = '1';          // names visible at all times by default
     tagEl.style.visibility = 'visible';
-    el.addEventListener('click', () => select(sel === p.id ? null : p.id));
-    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(sel === p.id ? null : p.id); } });
+
+    // The menu: 1) view the model (fly the camera to it)  2) open the panorama page
+    const menu = document.createElement('div'); menu.className = 'pin-menu';
+    const card = document.createElement('div'); card.className = 'pm-card'; card.setAttribute('role', 'menu');
+    const bModel = document.createElement('button');
+    bModel.type = 'button'; bModel.className = 'pm-btn'; bModel.setAttribute('role', 'menuitem'); bModel.textContent = 'View model';
+    bModel.addEventListener('click', (e) => { e.stopPropagation(); select(sel === p.id ? null : p.id); openMenu(null); });
+    let bPano;
+    if (p.vrPage) {
+      bPano = document.createElement('a');
+      bPano.href = VR_DIR + p.vrPage; bPano.textContent = 'Panorama';
+      bPano.addEventListener('click', (e) => { e.stopPropagation(); markExplored(p.id); });
+    } else {                                // no panorama page for this building yet
+      bPano = document.createElement('button');
+      bPano.type = 'button'; bPano.disabled = true; bPano.textContent = 'Panorama (coming soon)';
+    }
+    bPano.className = 'pm-btn alt'; bPano.setAttribute('role', 'menuitem');
+    card.append(bModel, bPano); menu.appendChild(card); el.appendChild(menu);
+    p.modelBtn = bModel;
+
+    const toggle = () => openMenu(menuOpen === p ? null : p);
+    el.addEventListener('click', (e) => { if (!e.target.closest('.pin-menu')) toggle(); });
+    el.addEventListener('keydown', (e) => { if (e.target === el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(); } });
+    el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') { hoverPin = p.id; updateHighlight(); } });
+    el.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && hoverPin === p.id) { hoverPin = null; updateHighlight(); } });
     pinLayer.appendChild(el); p.el = el;
 
-    const chip = document.createElement('button');
-    chip.className = 'chip'; chip.type = 'button'; chip.textContent = p.short;
-    chip.addEventListener('click', () => select(sel === p.id ? null : p.id));
-    chipBar.appendChild(chip); p.chip = chip;
-
-    if (explored.has(p.id)) { el.classList.add('explored'); chip.classList.add('explored'); }
+    if (explored.has(p.id)) el.classList.add('explored');
   });
   /* ---------- name-only labels: no icon, no click, just the building's name ---------- */
   const nameLabels = world.labels || [];
@@ -118,12 +149,9 @@ function start() {
     pinLayer.appendChild(el); p.el = el;
   });
 
-  const overview = document.createElement('button');
-  overview.className = 'chip overview'; overview.type = 'button'; overview.textContent = 'Overview';
-  overview.addEventListener('click', () => select(null));
-  chipBar.insertBefore(overview, chipBar.firstChild);
-  $('closePanel').addEventListener('click', () => select(null));
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') select(null); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { openMenu(null); select(null); } });
+  const overviewBtn = $('overviewBtn');
+  overviewBtn.addEventListener('click', () => { openMenu(null); resetView(); });   // back to the original view
 
   /* ---------- camera state ---------- */
   const home = { theta: 0.22, e: 0.55, r: 56, tx: 0, ty: 1, tz: -1 };   // default overview angle, pulled back to show the fence + neighborhood
@@ -135,26 +163,18 @@ function start() {
     sel = id;
     places.forEach((p) => {
       p.el.classList.toggle('on', p.id === id);
-      p.chip.classList.toggle('on', p.id === id);
-      const tagEl = p.el.querySelector('.tag');
-      if (tagEl) tagEl.style.visibility = (p.id === id) ? 'hidden' : 'visible';
+      if (p.modelBtn) p.modelBtn.textContent = p.id === id ? 'Back to overview' : 'View model';
     });
-    overview.classList.toggle('on', !id);
+    overviewBtn.classList.toggle('on', !id);
     if (id) {
       const p = places.find((q) => q.id === id);
-      titleEl.textContent = p.name; descEl.textContent = p.description;
-      if (p.vrPage) { enterVR.href = VR_DIR + p.vrPage; enterVR.hidden = false; vrNote.hidden = true; }
-      else { enterVR.removeAttribute('href'); enterVR.hidden = true; vrNote.hidden = false; }
-      panel.hidden = false;
       goal.tx = p.anchor.x; goal.ty = 0.8; goal.tz = p.anchor.z; goal.r = 20; goal.e = Math.max(goal.e, 0.48);
       markExplored(id);
     } else {
-      panel.hidden = true;
       goal.tx = home.tx; goal.ty = home.ty; goal.tz = home.tz; goal.r = home.r;
     }
     try { history.replaceState(null, '', id ? '#' + id : location.pathname + location.search); } catch (e) { /* ignore */ }
   }
-  overview.classList.add('on');
 
   /* ---------- compass: ring carries N/E/S/W and turns with the view; the pointer marks "forward" ---------- */
   const compassWrap = document.createElement('div');
@@ -226,13 +246,13 @@ function start() {
     downAt = pointers.size === 1 ? { x: e.clientX, y: e.clientY } : null;
     if (pointers.size === 2) { const a = [...pointers.values()]; pinch = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); }
     inertia.theta = 0; inertia.e = 0; velTheta = 0; velE = 0;   // grabbing the view cancels any ongoing spin
-    tooltip.style.opacity = 0; touched();
+    tooltip.style.opacity = 0; openMenu(null); touched();
   });
   stage.addEventListener('pointermove', (e) => {
     const p = pointers.get(e.pointerId);
     if (!p) {                                      // hovering (mouse only)
       const hit = e.pointerType === 'mouse' ? pick(e) : null;
-      hover = hit ? hit.id : null;
+      hover = hit ? hit.id : null; updateHighlight();
       stage.style.cursor = hit ? 'pointer' : '';
       if (hit) { tooltip.textContent = hit.name; tooltip.style.transform = `translate(${e.clientX + 16}px, ${e.clientY + 16}px)`; tooltip.style.opacity = 1; }
       else tooltip.style.opacity = 0;
@@ -272,11 +292,17 @@ function start() {
       lastTap = { time: now, x: e.clientX, y: e.clientY };
       if (isDouble) { resetView(); downAt = null; return; }
     }
-    if (wasClick) { const hit = pick(e); if (hit) select(hit.id); else if (sel) select(null); }
+    if (wasClick && gpsTestClick(e)) { downAt = null; return; }   // GPS test mode: a click places the test position
+    if (wasClick) {
+      const hit = pick(e);
+      if (hit && hit.el.style.display !== 'none') openMenu(hit);   // tapping a building opens the same menu as its pin
+      else if (hit) select(hit.id);
+      else { openMenu(null); if (sel) select(null); }              // empty ground: close menu / back to overview
+    }
     downAt = null;
   });
   stage.addEventListener('pointercancel', (e) => { endPointer(e); downAt = null; });
-  stage.addEventListener('pointerleave', () => { hover = null; tooltip.style.opacity = 0; });
+  stage.addEventListener('pointerleave', () => { hover = null; tooltip.style.opacity = 0; updateHighlight(); });
   stage.addEventListener('dblclick', (e) => { e.preventDefault(); resetView(); });   // mouse: double-click to reset
   stage.addEventListener('wheel', (e) => {     // mouse wheel / trackpad: small clamped zoom, toward the cursor
     e.preventDefault();
@@ -292,6 +318,131 @@ function start() {
     fit = camera.aspect < 1.7 ? Math.pow(1.7 / camera.aspect, 0.6) : 1;   // pull back on narrow screens
   }
   window.addEventListener('resize', resize); resize();
+
+  /* ---------- "My location": real GPS position shown on the map (see GPS in config.js) ---------- */
+  let mapper = null;
+  try { mapper = GPS && GPS.enabled ? createGeoMapper(GPS, BUILDINGS) : null; } catch (err) { console.warn('[GPS] switched off:', err.message); }
+  const gpsTest = new URLSearchParams(location.search).has('gpstest');   // campus.html?gpstest -> click the map to place yourself
+  let me = null, watchId = null, testing = false, firstFix = true, toastTimer = 0, testClick = null;
+  const NAME_KEY = 'campus-gps-name';
+  const meName = () => { try { return localStorage.getItem(NAME_KEY) || ''; } catch (e) { return ''; } };
+  // how far outside the buildings a position may be and still be drawn
+  const gpsBox = BUILDINGS.reduce((b, q) => ({
+    x0: Math.min(b.x0, q.x), x1: Math.max(b.x1, q.x + (q.w || 0)), y0: Math.min(b.y0, q.y), y1: Math.max(b.y1, q.y + (q.h || 0))
+  }), { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity });
+  const GPS_MARGIN = 150;
+
+  if (mapper) {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'gps-btn';
+    const toastEl = document.createElement('div'); toastEl.className = 'gps-toast'; toastEl.setAttribute('role', 'status');
+    document.body.append(btn, toastEl);
+    const toast = (msg, ms = 4500) => {
+      toastEl.textContent = msg; toastEl.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
+    };
+    const paintBtn = () => { const on = testing || watchId !== null; btn.classList.toggle('on', on); btn.textContent = gpsTest ? (on ? '\u{1F4CD} Test: click the map' : '\u{1F4CD} Test position') : (on ? '\u{1F4CD} Stop' : '\u{1F4CD} My location'); };
+    paintBtn();
+
+    function clearMe() { if (me) { me.el.remove(); me = null; } }
+    function setMe(x3, z3, accuracy) {
+      if (!me) {
+        const el = document.createElement('div'); el.className = 'me-pin';
+        el.innerHTML = '<span class="me-dot"></span><span class="me-label"></span>';
+        pinLayer.appendChild(el); me = { el, label: el.querySelector('.me-label'), x3, z3 };
+      }
+      me.x3 = x3; me.z3 = z3;
+      me.label.textContent = (meName() || GPS.defaultName || 'You') + (accuracy ? ' \u00B1' + Math.round(accuracy) + ' m' : '');
+    }
+    const toScene = (px, py) => ({ x: (px - MAP_CENTER.x) / MAP_SCALE, z: (py - MAP_CENTER.y) / MAP_SCALE });
+    function flyToMe() {
+      if (sel) select(null);
+      goal.tx = me.x3; goal.tz = me.z3; goal.ty = home.ty; goal.r = Math.min(home.r, 50);
+    }
+    function onFix(pos) {
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      const p = mapper.toPixel(lat, lng);
+      if (p.x < gpsBox.x0 - GPS_MARGIN || p.x > gpsBox.x1 + GPS_MARGIN || p.y < gpsBox.y0 - GPS_MARGIN || p.y > gpsBox.y1 + GPS_MARGIN) {
+        clearMe();
+        const d = mapper.distanceMeters(lat, lng);
+        toast('You are outside the campus map (' + (d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m') + ' from it).');
+        return;
+      }
+      const s = toScene(p.x, p.y); setMe(s.x, s.z, accuracy);
+      if (firstFix) { firstFix = false; flyToMe(); }
+    }
+    function onError(err) {
+      const msg = { 1: 'Location permission was denied. Allow it in the browser settings to use this.', 2: 'Your position is not available right now.', 3: 'Getting your position took too long. Try again outdoors.' }[err.code] || 'Could not get your position.';
+      toast(msg);
+      if (err.code === 1) stopWatch();       // denied: give up.  Signal lost / slow fix: keep watching, the marker stays where it was
+    }
+    function stopWatch() { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } clearMe(); firstFix = true; paintBtn(); }
+
+    btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (gpsTest) {                                                   // test mode: the map click does the work
+        testing = !testing; if (!testing) clearMe(); else toast('Click anywhere on the map to place yourself there.'); paintBtn(); return;
+      }
+      if (watchId !== null) { stopWatch(); return; }
+      if (!('geolocation' in navigator)) { toast('This browser cannot read your location.'); return; }
+      if (!window.isSecureContext) { toast('Location only works on a secure (https) page.'); return; }
+      if (!meName()) {                                                 // ask once, then remember
+        let n = null; try { n = window.prompt('Your name on the map?', GPS.defaultName || 'You'); } catch (err) { /* ignore */ }
+        if (n && n.trim()) { try { localStorage.setItem(NAME_KEY, n.trim().slice(0, 24)); } catch (err) { /* ignore */ } }
+      }
+      toast('Finding your position\u2026', 8000);
+      watchId = navigator.geolocation.watchPosition((pos) => { toastEl.classList.remove('show'); onFix(pos); }, onError, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+      paintBtn();
+    });
+
+    // test mode: a click on the map becomes the position (and shows the GPS numbers for that spot)
+    const gpsPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), gpsHit = new THREE.Vector3();
+    testClick = function (e) {
+      if (!testing) return false;
+      const r = stage.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      if (!raycaster.ray.intersectPlane(gpsPlane, gpsHit)) return true;
+      const ll = mapper.toLatLng(gpsHit.x * MAP_SCALE + MAP_CENTER.x, gpsHit.z * MAP_SCALE + MAP_CENTER.y);
+      setMe(gpsHit.x, gpsHit.z, 0);
+      toast('Test position: ' + ll.lat.toFixed(6) + ', ' + ll.lng.toFixed(6), 6000);
+      return true;
+    };
+    console.log('[GPS] ready:', mapper.info);
+  }
+  function gpsTestClick(e) { return testClick ? testClick(e) : false; }
+
+  /* ---------- hamburger menu: choose the ground (spring, winter, desert, ...) ---------- */
+  const fx = world.effects;
+  if (fx && fx.themes) {
+    const mBtn = document.createElement('button');
+    mBtn.type = 'button'; mBtn.className = 'menu-btn'; mBtn.setAttribute('aria-label', 'Menu');
+    mBtn.setAttribute('aria-haspopup', 'true'); mBtn.setAttribute('aria-expanded', 'false');
+    mBtn.innerHTML = '<span></span><span></span><span></span>';
+    const mPanel = document.createElement('div'); mPanel.className = 'menu-panel card'; mPanel.hidden = true;
+    const head = document.createElement('p'); head.className = 'menu-title'; head.textContent = 'Ground';
+    mPanel.appendChild(head);
+    const opts = fx.themes.map((t) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'theme-opt'; b.dataset.id = t.id;
+      b.innerHTML = '<span class="theme-swatch"></span><span class="theme-name"></span><span class="theme-wx"></span>';
+      b.querySelector('.theme-swatch').style.background = t.swatch;
+      b.querySelector('.theme-name').textContent = t.icon + ' ' + t.name;
+      b.querySelector('.theme-wx').textContent = t.weather || '';
+      b.addEventListener('click', () => fx.setTheme(t.id));
+      mPanel.appendChild(b); return b;
+    });
+    const paintMenu = (st) => opts.forEach((b) => { const on = b.dataset.id === st.theme; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    fx.onChange(paintMenu); paintMenu(fx.state);
+    const setOpen = (open) => { mPanel.hidden = !open; mBtn.classList.toggle('open', open); mBtn.setAttribute('aria-expanded', String(open)); };
+    mBtn.addEventListener('click', (e) => { e.stopPropagation(); setOpen(mPanel.hidden); });
+    mBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    mPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+    stage.addEventListener('pointerdown', () => setOpen(false));          // tap the map: close the menu
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+    document.body.append(mBtn, mPanel);
+  }
 
   /* ---------- main loop ---------- */
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -331,6 +482,9 @@ function start() {
       const x = (v3.x * 0.5 + 0.5) * w, y = (-v3.y * 0.5 + 0.5) * h;
       const s = Math.max(0.7, Math.min(1.25, 48 / camera.position.distanceTo(p.anchor)));
       p.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${s.toFixed(3)})`;
+      p.el.style.setProperty('--ps', s.toFixed(3));              // lets the menu cancel the pin's scale (keeps it a readable size)
+      p.el.classList.toggle('flip', x > w - 200);                // open the menu to the left near the right edge
+      p.el.classList.toggle('up', y > h - 120);                  // open it upwards near the bottom edge
       p.el.style.zIndex = Math.round(y);
     }
     for (const p of nameLabels) {
@@ -342,6 +496,15 @@ function start() {
       const s = Math.max(0.7, Math.min(1.1, 44 / camera.position.distanceTo(p.anchor)));
       p.el.style.transform = `translate(-50%, -100%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${s.toFixed(3)})`;
       p.el.style.zIndex = Math.round(y);
+    }
+    if (me) {                                                        // GPS marker
+      v3.set(me.x3, 0.2, me.z3).project(camera);
+      const vis = v3.z < 1 && Math.abs(v3.x) < 1.15 && Math.abs(v3.y) < 1.15;
+      me.el.style.display = vis ? '' : 'none';
+      if (vis) {
+        me.el.style.transform = `translate(${((v3.x * 0.5 + 0.5) * w).toFixed(1)}px, ${((-v3.y * 0.5 + 0.5) * h).toFixed(1)}px)`;
+        me.el.style.zIndex = 5000;
+      }
     }
     requestAnimationFrame(frame);
   }

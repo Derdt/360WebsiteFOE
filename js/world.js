@@ -19,9 +19,61 @@ import * as CFG from './config.js';
 
 // Effect defaults. Override them by exporting EFFECTS from config.js (see config.js).
 const FX = Object.assign(
-  { night: true, fireworks: true, snow: false, ui: true, uiCorner: 'bottom-left', remember: true },
+  { night: true, fireworks: true, weather: false, theme: 'winter', ui: true, uiCorner: 'bottom-left', remember: true },
   CFG.EFFECTS || {}
 );
+if (CFG.EFFECTS && CFG.EFFECTS.weather === undefined && typeof CFG.EFFECTS.snow === 'boolean') FX.weather = CFG.EFFECTS.snow;   // old config name
+
+// ---------------------------------------------------------------------------
+//  Ground themes (chosen from the hamburger menu on the page).
+//    ground  = the two colours you see in daylight (mixed in a soft pattern); night makes them darker by itself
+//    weather = what falls from the sky with this theme (null = nothing).
+//              layers: n = how many, size, fall = speed down, sway = wobble, drift = wind sideways,
+//                      color, tex = 'soft' | 'leaf' | 'petal', opacity
+//  To add a theme: copy one line and give it a new key, name, icon and colours.
+// ---------------------------------------------------------------------------
+const GROUND_GAIN = 1.95;   // the scene's lights roughly double colours; this keeps the colours below "what you see"
+const THEMES = {
+  grass: { name: 'Green grass', icon: '\u{1F33F}', ground: [0x7db84a, 0x5e9e3b], weather: null },
+  spring: {
+    name: 'Spring', icon: '\u{1F338}', ground: [0x9fd36d, 0x7fc15a],
+    weather: {
+      label: '\u{1F338} Petals', layers: [
+        { n: 350, size: 0.5, fall: 0.9, sway: 0.9, drift: 0.5, color: 0xffb3cf, tex: 'petal', opacity: 0.95 },
+        { n: 250, size: 0.4, fall: 1.1, sway: 0.7, drift: 0.5, color: 0xffe3ee, tex: 'petal', opacity: 0.95 }
+      ]
+    }
+  },
+  summer: { name: 'Summer (dry)', icon: '\u2600\uFE0F', ground: [0xc2b150, 0xa59a3f], weather: null },
+  autumn: {
+    name: 'Autumn', icon: '\u{1F342}', ground: [0xb98a45, 0x9c6e34],
+    weather: {
+      label: '\u{1F342} Leaves', layers: [
+        { n: 220, size: 0.7, fall: 1.2, sway: 1.4, drift: 0.8, color: 0xd9822b, tex: 'leaf', opacity: 1 },
+        { n: 200, size: 0.6, fall: 1.4, sway: 1.2, drift: 0.8, color: 0xb5472a, tex: 'leaf', opacity: 1 },
+        { n: 160, size: 0.6, fall: 1.0, sway: 1.5, drift: 0.8, color: 0xe8b830, tex: 'leaf', opacity: 1 }
+      ]
+    }
+  },
+  winter: {
+    name: 'Winter (snow)', icon: '\u2744\uFE0F', ground: [0xf5eeea, 0xe6e4e8],
+    weather: {
+      label: '\u2744\uFE0F Snow', layers: [
+        { n: 1400, size: 0.22, fall: 1.1, sway: 0.35, drift: 0, color: 0xffffff, tex: 'soft', opacity: 0.85 },   // small, far flakes
+        { n: 500, size: 0.55, fall: 1.7, sway: 0.6, drift: 0, color: 0xffffff, tex: 'soft', opacity: 0.9 }      // big fluffy flakes
+      ]
+    }
+  },
+  desert: {
+    name: 'Desert', icon: '\u{1F3DC}\uFE0F', ground: [0xe0c081, 0xcfa968],
+    weather: {
+      label: '\u{1F32C}\uFE0F Dust', layers: [
+        { n: 1100, size: 0.5, fall: 0.15, sway: 0.5, drift: 6, color: 0xe6cf9f, tex: 'soft', opacity: 0.45 },
+        { n: 300, size: 1.1, fall: 0.1, sway: 0.6, drift: 8, color: 0xd9bd86, tex: 'soft', opacity: 0.25 }
+      ]
+    }
+  }
+};
 
 // Same colours and lighting as the approved demo (which used the classic three.js look).
 THREE.ColorManagement.enabled = false;
@@ -93,11 +145,15 @@ export function heightAt() { return 0; }        // the whole map sits at one fla
 
     // Effect switches (night / fireworks / snow). The last choice is remembered in the browser.
     const FX_KEY = 'campus-effects-v1';
-    const fxState = { night: !!FX.night, fireworks: !!FX.fireworks, snow: !!FX.snow };
+    const fxState = { night: !!FX.night, fireworks: !!FX.fireworks, weather: !!FX.weather, theme: THEMES[FX.theme] ? FX.theme : 'winter' };
     if (FX.remember) {
       try {
         const saved = JSON.parse(localStorage.getItem(FX_KEY) || 'null');
-        if (saved) for (const k of ['night', 'fireworks', 'snow']) if (typeof saved[k] === 'boolean') fxState[k] = saved[k];
+        if (saved) {
+          for (const k of ['night', 'fireworks', 'weather']) if (typeof saved[k] === 'boolean') fxState[k] = saved[k];
+          if (saved.weather === undefined && typeof saved.snow === 'boolean') fxState.weather = saved.snow;   // older saved name
+          if (THEMES[saved.theme]) fxState.theme = saved.theme;
+        }
       } catch (e) { /* no storage available: just use the defaults */ }
     }
     const cloudMats = [];
@@ -215,66 +271,34 @@ scene.fog = new THREE.Fog(
   }
   applyTime(fxState.night);
 
-  /* ---------- terrain and lake ---------- */
+  /* ---------- terrain (colours come from the ground theme) ---------- */
+  let terrainGeo = null, terrainNoise = null;
   {
     const g = new THREE.PlaneGeometry(300, 300, 260, 176);
     g.rotateX(-Math.PI / 2); g.translate(0, 0, -10);
-    const pos = g.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color();
-    // Snow ground. These values are darker than the snow looks on screen because the scene
-    // lights add up to roughly 2x brightness (so 0x807a78 renders as near-white and shadows
-    // stay visible). Lighter values = flatter, brighter snow; darker = greyer, more contrast.
-    const lime = new THREE.Color(0x807a78),   // fresh snow (main colour)
-      green = new THREE.Color(0x767577),      // slightly shaded patches
-      deep = new THREE.Color(0x6a6b71),       // blue-ish drifts
-      rock = new THREE.Color(0x5f6269),       // (only used if hills come back)
-      sand = new THREE.Color(0x807a78),       // lake-shore tint -> snow too
-      wet = new THREE.Color(0x6c6e73);        // low ground -> icy
+    const pos = g.attributes.position, noise = new Float32Array(pos.count);
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-
-      const terrainH = heightAt(x, z);
-      pos.setY(i, terrainH);
-
-      const n = fbm(x * 0.09 + 11, z * 0.09 + 5);
-
-      c.copy(lime).lerp(
-        green,
-        smoothstep(0.3, 0.75, n)
-      );
-
-      c.lerp(
-        deep,
-        smoothstep(1.5, 5, terrainH) * 0.8
-      );
-
-      c.lerp(
-        rock,
-        smoothstep(5.5, 9, terrainH) * 0.6
-      );
-
-      c.lerp(
-        sand,
-        (1 - smoothstep(0.0, 0.9, terrainH)) *
-        smoothstep(0.0, 0.12, lakeF(x, z))
-      );
-
-      if (terrainH < -0.7) {
-        c.lerp(wet, 0.8);
-      }
-
-      col[i * 3] = c.r;
-      col[i * 3 + 1] = c.g;
-      col[i * 3 + 2] = c.b;
+      const x = pos.getX(i), z = pos.getZ(i);
+      pos.setY(i, heightAt(x, z));
+      noise[i] = fbm(x * 0.09 + 11, z * 0.09 + 5);          // soft pattern that mixes the theme's two colours
     }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
     g.computeVertexNormals();
+    terrainGeo = g; terrainNoise = noise;
     const t = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
     t.receiveShadow = true; scene.add(t);
-
-    // const skirt = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), new THREE.MeshBasicMaterial({ color: 0x6f9a3c }));
-    // skirt.rotation.x = -Math.PI / 2; skirt.position.y = -3.2; scene.add(skirt);
   }
+  function applyGround(id) {
+    const T = THEMES[id] || THEMES.grass, k = 1 / GROUND_GAIN;
+    const ca = new THREE.Color(T.ground[0]).multiplyScalar(k), cb = new THREE.Color(T.ground[1]).multiplyScalar(k), c = new THREE.Color();
+    const attr = terrainGeo.attributes.color, arr = attr.array;
+    for (let i = 0; i < terrainNoise.length; i++) {
+      c.copy(ca).lerp(cb, smoothstep(0.3, 0.75, terrainNoise[i]));
+      arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b;
+    }
+    attr.needsUpdate = true;
+  }
+  applyGround(fxState.theme);
 
   /* ---------- roads and footpaths ---------- */
   {
@@ -344,10 +368,82 @@ scene.fog = new THREE.Fog(
     const t = base.clone(); t.needsUpdate = true; t.repeat.set(1, reps); return t;
   }
   const glassMat = new THREE.MeshLambertMaterial({ color: 0x35506b, emissive: 0x4a2a06 });
+  // Extra height of a building's pin icon: its own `pinHeight` in config.js (positive = higher, negative = lower).
+  const pinLift = (o) => Number.isFinite(o.pinHeight) ? o.pinHeight : 0;
   const blockers = [];   // rectangles (screenshot pixels) where no trees are planted
   const places = [];     // clickable places: buildings with an id, plus the monument
   const buildingMeshes = [];
   const labels = [];     // name-only tags: buildings with a name but no id (not clickable, no icon)
+
+
+  /* ---------- building outline: shows how far a building reaches (appears when its pin is hovered / opened) ---------- */
+  const HL = {
+    color: 0x57d8ff,   // outline colour
+    y: 0.14,           // height above the ground (above roads and kerbs)
+    width: 0.3,        // thickness of the outline (3D units)
+    pad: 0.4,          // how far the outline sits outside the building
+    fill: 0.16         // opacity of the soft glow on the ground inside the outline (0 = none)
+  };
+  let hlActive = null;                      // id of the place whose outline is showing
+
+  // convex outline (monotone chain) of a list of [x, z] points
+  function hull2D(pts) {
+    pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    for (const q of pts) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+    for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    lo.pop(); up.pop();
+    return lo.concat(up);
+  }
+  // top-down footprint of a loaded model: every vertex flattened onto the ground, then wrapped in an outline
+  function footprintOf(model) {
+    model.updateWorldMatrix(true, true);
+    const pts = [];
+    model.traverse((m) => {
+      if (!m.isMesh || !m.geometry || !m.geometry.attributes.position) return;
+      const a = m.geometry.attributes.position, e = m.matrixWorld.elements, step = Math.max(1, Math.floor(a.count / 40000));
+      for (let i = 0; i < a.count; i += step) {
+        const x = a.getX(i), y = a.getY(i), z = a.getZ(i);
+        pts.push([e[0] * x + e[4] * y + e[8] * z + e[12], e[2] * x + e[6] * y + e[10] * z + e[14]]);
+      }
+    });
+    return pts.length >= 3 ? hull2D(pts) : null;
+  }
+  function makeOutline(hull) {
+    if (!hull || hull.length < 3) return null;
+    let cx = 0, cz = 0; hull.forEach((q) => { cx += q[0]; cz += q[1]; }); cx /= hull.length; cz /= hull.length;
+    const n = hull.length, ring = [], fill = [cx, HL.y, cz], ri = [], fi = [];
+    for (let i = 0; i < n; i++) {
+      let dx = hull[i][0] - cx, dz = hull[i][1] - cz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      ring.push(hull[i][0] + dx * HL.pad, HL.y, hull[i][1] + dz * HL.pad,                          // outer edge
+                hull[i][0] + dx * (HL.pad - HL.width), HL.y, hull[i][1] + dz * (HL.pad - HL.width)); // inner edge
+      fill.push(hull[i][0] + dx * (HL.pad - HL.width), HL.y, hull[i][1] + dz * (HL.pad - HL.width));
+    }
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n, a = i * 2, b = i * 2 + 1, c = j * 2, d = j * 2 + 1; ri.push(a, c, b, b, c, d); fi.push(0, i + 1, ((i + 1) % n) + 1); }
+    const mk = (pos, idx, opacity) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+      g.setIndex(idx);
+      const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: HL.color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+      m.renderOrder = 5; m.frustumCulled = false; return m;
+    };
+    const group = new THREE.Group();
+    group.add(mk(ring, ri, 0.9), mk(fill, fi, HL.fill));
+    group.visible = false;
+    scene.add(group);
+    return group;
+  }
+  function attachOutline(place, hull) {
+    const g = makeOutline(hull);
+    if (!g) return;
+    place.highlight = g;
+    g.visible = place.id === hlActive;
+  }
+  function setHighlight(id) {
+    hlActive = id || null;
+    for (const p of places) if (p.highlight) p.highlight.visible = p.id === hlActive;
+  }
 
   // Invisible box that receives clicks/hover for a place. Its opacity is used as a hover glow.
   function makeHit(place, w, h, d, x, y, z) {
@@ -440,9 +536,10 @@ scene.fog = new THREE.Fog(
         if (place) {
           place.anchor.set(
             group.position.x,
-            finalBox.max.y + 0.35,
+            finalBox.max.y + 0.35 + pinLift(o),
             group.position.z
           );
+          attachOutline(place, footprintOf(model));
         }
 
         console.log('[GLB] Loaded:', o.model);
@@ -532,7 +629,7 @@ scene.fog = new THREE.Fog(
 
           anchor: new THREE.Vector3(
             cx,
-            wallH + 0.35,
+            wallH + 0.35 + pinLift(o),
             cz
           ),
 
@@ -824,7 +921,7 @@ scene.fog = new THREE.Fog(
         anchor:
           new THREE.Vector3(
             cx,
-            topY + 0.35,
+            topY + 0.35 + pinLift(o),
             cz
           ),
 
@@ -842,6 +939,8 @@ scene.fog = new THREE.Fog(
         cz
       );
 
+      const hx = W / 2, hz = D / 2;
+      attachOutline(place, [[cx - hx, cz - hz], [cx + hx, cz - hz], [cx + hx, cz + hz], [cx - hx, cz + hz]]);
       places.push(place);
 
     }
@@ -1229,60 +1328,88 @@ scene.fog = new THREE.Fog(
     };
   }
 
-  /* ---------- falling snow: soft, fluffy flakes in two depth layers (toggle with effects.setSnow) ---------- */
-  const snowfall = { enabled: fxState.snow, layers: [], update() {}, setEnabled() {} };
+  /* ---------- weather: what falls from the sky depends on the ground theme (snow, petals, leaves, dust) ---------- */
+  const weather = { enabled: false, def: null, layers: [], update() {}, apply() {}, setEnabled() {} };
   {
-    const c = document.createElement('canvas'); c.width = c.height = 64;
-    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
-    const flakeTex = new THREE.CanvasTexture(c);
+    const mkTex = (draw) => {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d'); draw(g); return new THREE.CanvasTexture(c);
+    };
+    const TEX = {
+      soft: mkTex((g) => {                                    // round and fluffy
+        const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      }),
+      leaf: mkTex((g) => {                                    // pointed leaf
+        g.fillStyle = '#fff'; g.save(); g.translate(32, 32); g.rotate(-0.6);
+        g.beginPath(); g.moveTo(-26, 0); g.quadraticCurveTo(0, -17, 26, 0); g.quadraticCurveTo(0, 17, -26, 0); g.fill(); g.restore();
+      }),
+      petal: mkTex((g) => {                                   // rounder petal
+        g.fillStyle = '#fff'; g.save(); g.translate(32, 32); g.rotate(0.5);
+        g.beginPath(); g.ellipse(0, 0, 22, 14, 0, 0, Math.PI * 2); g.fill(); g.restore();
+      })
+    };
+    const BOX = { w: 70, h: 40, d: 70 };      // size of the weather box that follows the camera
 
-    const SNOW = { w: 70, h: 40, d: 70 };    // size of the snow box that follows the camera
-    const defs = [                           // tweak these to change the look
-      { n: 1400, size: 0.22, fall: 1.1, sway: 0.35, opacity: 0.85 },   // small, far flakes
-      { n: 500,  size: 0.55, fall: 1.7, sway: 0.6,  opacity: 0.9 }     // big fluffy flakes
-    ];
-    for (const d of defs) {
-      const pos = new Float32Array(d.n * 3), seed = new Float32Array(d.n), spd = new Float32Array(d.n);
-      for (let i = 0; i < d.n; i++) {
-        pos[i * 3] = (rnd() - 0.5) * SNOW.w;
-        pos[i * 3 + 1] = rnd() * SNOW.h;
-        pos[i * 3 + 2] = (rnd() - 0.5) * SNOW.d - 10;
-        seed[i] = rnd() * 6.283; spd[i] = 0.7 + rnd() * 0.6;
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const pts = new THREE.Points(geo, new THREE.PointsMaterial({
-        map: flakeTex, size: d.size, sizeAttenuation: true, transparent: true,
-        opacity: d.opacity, depthWrite: false, color: 0xffffff
-      }));
-      pts.frustumCulled = false; pts.visible = snowfall.enabled;
-      scene.add(pts);
-      snowfall.layers.push({ pts, pos, seed, spd, d });
+    function clear() {
+      for (const L of weather.layers) { scene.remove(L.pts); L.pts.geometry.dispose(); L.pts.material.dispose(); }
+      weather.layers = [];
     }
-    snowfall.update = (dt, time, camera) => {
-      if (!snowfall.enabled) return;
+    weather.apply = (def) => {                // switch to another theme's weather (or none)
+      clear(); weather.def = def || null;
+      if (!def) return;
+      for (const d of def.layers) {
+        const pos = new Float32Array(d.n * 3), seed = new Float32Array(d.n), spd = new Float32Array(d.n);
+        for (let i = 0; i < d.n; i++) {
+          pos[i * 3] = (rnd() - 0.5) * BOX.w;
+          pos[i * 3 + 1] = rnd() * BOX.h;
+          pos[i * 3 + 2] = (rnd() - 0.5) * BOX.d - 10;
+          seed[i] = rnd() * 6.283; spd[i] = 0.7 + rnd() * 0.6;
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+          map: TEX[d.tex] || TEX.soft, size: d.size, sizeAttenuation: true, transparent: true,
+          opacity: d.opacity, depthWrite: false, color: d.color
+        }));
+        pts.frustumCulled = false; pts.visible = weather.enabled;
+        scene.add(pts);
+        weather.layers.push({ pts, pos, seed, spd, d });
+      }
+    };
+    weather.update = (dt, time, camera) => {
+      if (!weather.enabled || !weather.def) return;
       dt = Math.min(dt, 0.05);
       const cam = camera.position;
-      for (const { pts, pos, seed, spd, d } of snowfall.layers) {
+      for (const { pts, pos, seed, spd, d } of weather.layers) {
         for (let i = 0; i < spd.length; i++) {
           const k = i * 3;
-          pos[k + 1] -= d.fall * spd[i] * dt;                                  // fall
-          pos[k] += Math.sin(time * 0.7 + seed[i]) * d.sway * dt;              // sway left/right
+          pos[k + 1] -= d.fall * spd[i] * dt;                                    // fall
+          pos[k] += (Math.sin(time * 0.7 + seed[i]) * d.sway + d.drift) * dt;    // sway left/right + wind
           pos[k + 2] += Math.cos(time * 0.5 + seed[i]) * d.sway * 0.6 * dt;
-          if (pos[k + 1] < 0) pos[k + 1] += SNOW.h;                            // reached ground -> back to the top
-          if (pos[k] < cam.x - SNOW.w / 2) pos[k] += SNOW.w; else if (pos[k] > cam.x + SNOW.w / 2) pos[k] -= SNOW.w;
-          if (pos[k + 2] < cam.z - SNOW.d / 2) pos[k + 2] += SNOW.d; else if (pos[k + 2] > cam.z + SNOW.d / 2) pos[k + 2] -= SNOW.d;
+          if (pos[k + 1] < 0) pos[k + 1] += BOX.h;                               // reached the ground -> back to the top
+          if (pos[k] < cam.x - BOX.w / 2) pos[k] += BOX.w; else if (pos[k] > cam.x + BOX.w / 2) pos[k] -= BOX.w;
+          if (pos[k + 2] < cam.z - BOX.d / 2) pos[k + 2] += BOX.d; else if (pos[k + 2] > cam.z + BOX.d / 2) pos[k + 2] -= BOX.d;
         }
         pts.geometry.attributes.position.needsUpdate = true;
       }
     };
-    snowfall.setEnabled = (on) => { snowfall.enabled = on; for (const L of snowfall.layers) L.pts.visible = on; };
+    weather.setEnabled = (on) => { weather.enabled = !!on; for (const L of weather.layers) L.pts.visible = weather.enabled; };
+    weather.enabled = fxState.weather && !!THEMES[fxState.theme].weather;
+    weather.apply(THEMES[fxState.theme].weather);
   }
 
   /* ---------- per-frame animation ---------- */
   function update(dt, time, camera) {
+    if (hlActive) {                                         // gentle pulse on the outline that is showing
+      const hp = places.find((q) => q.id === hlActive);
+      if (hp && hp.highlight) {
+        const k = 0.5 + 0.5 * Math.sin(time * 4);
+        hp.highlight.children[0].material.opacity = 0.65 + 0.35 * k;
+        hp.highlight.children[1].material.opacity = HL.fill * (0.6 + 0.8 * k);
+      }
+    }
     skyGroup.position.copy(camera.position);
     for (const c of cars) {
       c.s += c.v * dt; if (c.s > 52) c.s = -52; if (c.s < -52) c.s = 52;
@@ -1297,13 +1424,16 @@ scene.fog = new THREE.Fog(
       c.m.rotation.y = -Math.atan2(fz, fx);
     }
     fireworks.update(dt, time, camera);
-    snowfall.update(dt, time, camera);
+    weather.update(dt, time, camera);
     boat.position.y = LAKE.waterY + Math.sin(time * 1.3) * 0.05; boat.rotation.z = Math.sin(time * 1.1) * 0.05; boat.rotation.y = 0.5 + Math.sin(time * 0.2) * 0.2;
     clouds.forEach((c, i) => { c.position.x += dt * (0.5 + (i % 3) * 0.25); if (c.position.x > 140) c.position.x = -140; });
   }
 
-  /* ---------- effects switches: night / fireworks / snow ---------- */
+  /* ---------- effects switches: night / fireworks / weather, and the ground theme ---------- */
   applyTime(fxState.night);        // again, now that the clouds exist
+  const themeList = Object.entries(THEMES).map(([id, T]) => ({
+    id, name: T.name, icon: T.icon, swatch: '#' + T.ground[0].toString(16).padStart(6, '0'), weather: T.weather ? T.weather.label : null
+  }));
   const listeners = [];
   const changed = () => {
     if (FX.remember) { try { localStorage.setItem(FX_KEY, JSON.stringify(fxState)); } catch (e) { /* ignore */ } }
@@ -1313,10 +1443,19 @@ scene.fog = new THREE.Fog(
     get state() { return { ...fxState }; },
     setNight(on) { fxState.night = !!on; applyTime(fxState.night); changed(); },
     setFireworks(on) { fxState.fireworks = !!on; fireworks.setEnabled(fxState.fireworks); changed(); },
-    setSnow(on) { fxState.snow = !!on; snowfall.setEnabled(fxState.snow); changed(); },
+    get themes() { return themeList; },
+    setWeather(on) { fxState.weather = !!on; weather.setEnabled(fxState.weather && !!THEMES[fxState.theme].weather); changed(); },
+    setTheme(id) {                         // new ground; a theme that has weather also turns the weather on
+      if (!THEMES[id]) return;
+      fxState.theme = id; applyGround(id); weather.apply(THEMES[id].weather);
+      if (THEMES[id].weather) fxState.weather = true;
+      weather.setEnabled(fxState.weather && !!THEMES[id].weather); changed();
+    },
     toggleNight() { this.setNight(!fxState.night); },
     toggleFireworks() { this.setFireworks(!fxState.fireworks); },
-    toggleSnow() { this.setSnow(!fxState.snow); },
+    toggleWeather() { this.setWeather(!fxState.weather); },
+    setSnow(on) { this.setWeather(on); },            // old names, kept so nothing breaks
+    toggleSnow() { this.toggleWeather(); },
     onChange(fn) { listeners.push(fn); }
   };
 
@@ -1335,15 +1474,17 @@ scene.fog = new THREE.Fog(
     const style = (b, on) => { b.style.background = on ? 'rgba(255,255,255,0.92)' : 'rgba(20,28,50,0.72)'; b.style.color = on ? '#16203a' : '#fff'; b.setAttribute('aria-pressed', String(!!on)); };
     const bTime = mk(() => effects.toggleNight());
     const bFire = mk(() => effects.toggleFireworks());
-    const bSnow = mk(() => effects.toggleSnow());
+    const bWeather = mk(() => effects.toggleWeather());
     const paint = (st) => {
       bTime.textContent = st.night ? '\u{1F319} Night' : '\u2600\uFE0F Day'; style(bTime, !st.night);
       bFire.textContent = '\u{1F386} Fireworks'; style(bFire, st.fireworks);
-      bSnow.textContent = '\u2744\uFE0F Snow'; style(bSnow, st.snow);
+      const W = THEMES[st.theme].weather;                              // this button follows the ground theme
+      bWeather.style.display = W ? '' : 'none';
+      if (W) { bWeather.textContent = W.label; style(bWeather, st.weather); }
     };
     effects.onChange(paint); paint(fxState);
     document.body.appendChild(bar);
   }
 
-  return { places, buildingMeshes, labels, update, effects };
+  return { places, buildingMeshes, labels, update, effects, setHighlight };
 }
