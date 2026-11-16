@@ -6,10 +6,14 @@ import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { VR_DIR, BUILDINGS, MAP_SCALE, MAP_CENTER, GPS } from './config.js';
 import { createGeoMapper } from './Gps-map.js';
+import { t, placeText, getLang, setLang, onLang, LANGS } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage'), pinLayer = $('pins');
 const tooltip = $('tooltip'), hint = $('hint'), fallback = $('fallback');
+// every piece of text that depends on the language registers a small repaint function here
+const langHooks = [];
+onLang(() => langHooks.forEach((f) => f()));
 
 function fail(message, err) {
   if (err) console.error(err);
@@ -99,11 +103,11 @@ function start() {
   places.forEach((p) => {
     const el = document.createElement('div');
     el.className = 'pin' + (p.main ? ' main' : '');
-    el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-label', p.name);
+    el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-label', placeText(p, 'name'));
     el.setAttribute('aria-haspopup', 'menu'); el.setAttribute('aria-expanded', 'false');
     el.innerHTML = '<span class="bob"><span class="drop">' + (ICONS[p.icon] || ICONS.home) + '</span><span class="tag"></span></span>';
     const tagEl = el.querySelector('.tag');
-    tagEl.textContent = p.short;
+    tagEl.textContent = placeText(p, 'short');
     tagEl.style.opacity = '1';          // names visible at all times by default
     tagEl.style.visibility = 'visible';
 
@@ -111,20 +115,26 @@ function start() {
     const menu = document.createElement('div'); menu.className = 'pin-menu';
     const card = document.createElement('div'); card.className = 'pm-card'; card.setAttribute('role', 'menu');
     const bModel = document.createElement('button');
-    bModel.type = 'button'; bModel.className = 'pm-btn'; bModel.setAttribute('role', 'menuitem'); bModel.textContent = 'View model';
+    bModel.type = 'button'; bModel.className = 'pm-btn'; bModel.setAttribute('role', 'menuitem'); bModel.textContent = t('viewModel');
     bModel.addEventListener('click', (e) => { e.stopPropagation(); select(sel === p.id ? null : p.id); openMenu(null); });
     let bPano;
     if (p.vrPage) {
       bPano = document.createElement('a');
-      bPano.href = VR_DIR + p.vrPage; bPano.textContent = 'Panorama';
+      bPano.href = VR_DIR + p.vrPage; bPano.textContent = t('panorama');
       bPano.addEventListener('click', (e) => { e.stopPropagation(); markExplored(p.id); });
     } else {                                // no panorama page for this building yet
       bPano = document.createElement('button');
-      bPano.type = 'button'; bPano.disabled = true; bPano.textContent = 'Panorama (coming soon)';
+      bPano.type = 'button'; bPano.disabled = true; bPano.textContent = t('panoSoon');
     }
     bPano.className = 'pm-btn alt'; bPano.setAttribute('role', 'menuitem');
     card.append(bModel, bPano); menu.appendChild(card); el.appendChild(menu);
     p.modelBtn = bModel;
+    langHooks.push(() => {
+      el.setAttribute('aria-label', placeText(p, 'name'));
+      tagEl.textContent = placeText(p, 'short');
+      bModel.textContent = t(sel === p.id ? 'backOverview' : 'viewModel');
+      bPano.textContent = t(p.vrPage ? 'panorama' : 'panoSoon');
+    });
 
     const toggle = () => openMenu(menuOpen === p ? null : p);
     el.addEventListener('click', (e) => { if (!e.target.closest('.pin-menu')) toggle(); });
@@ -139,7 +149,8 @@ function start() {
   const nameLabels = world.labels || [];
   nameLabels.forEach((p) => {
     const el = document.createElement('div');
-    el.textContent = p.name;
+    el.textContent = placeText(p, 'name');
+    langHooks.push(() => { el.textContent = placeText(p, 'name'); });
     el.setAttribute('aria-hidden', 'true');
     Object.assign(el.style, {
       position: 'absolute', left: '0', top: '0', pointerEvents: 'none',
@@ -152,6 +163,7 @@ function start() {
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { openMenu(null); select(null); } });
   const overviewBtn = $('overviewBtn');
   overviewBtn.addEventListener('click', () => { openMenu(null); resetView(); });   // back to the original view
+  langHooks.push(() => { overviewBtn.textContent = t('overview'); hint.textContent = t('hint'); });
 
   /* ---------- camera state ---------- */
   const home = { theta: 0.22, e: 0.55, r: 56, tx: 0, ty: 1, tz: -1 };   // default overview angle, pulled back to show the fence + neighborhood
@@ -163,7 +175,7 @@ function start() {
     sel = id;
     places.forEach((p) => {
       p.el.classList.toggle('on', p.id === id);
-      if (p.modelBtn) p.modelBtn.textContent = p.id === id ? 'Back to overview' : 'View model';
+      if (p.modelBtn) p.modelBtn.textContent = t(p.id === id ? 'backOverview' : 'viewModel');
     });
     overviewBtn.classList.toggle('on', !id);
     if (id) {
@@ -254,7 +266,7 @@ function start() {
       const hit = e.pointerType === 'mouse' ? pick(e) : null;
       hover = hit ? hit.id : null; updateHighlight();
       stage.style.cursor = hit ? 'pointer' : '';
-      if (hit) { tooltip.textContent = hit.name; tooltip.style.transform = `translate(${e.clientX + 16}px, ${e.clientY + 16}px)`; tooltip.style.opacity = 1; }
+      if (hit) { tooltip.textContent = placeText(hit, 'name'); tooltip.style.transform = `translate(${e.clientX + 16}px, ${e.clientY + 16}px)`; tooltip.style.opacity = 1; }
       else tooltip.style.opacity = 0;
       return;
     }
@@ -341,8 +353,9 @@ function start() {
       toastEl.textContent = msg; toastEl.classList.add('show');
       clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
     };
-    const paintBtn = () => { const on = testing || watchId !== null; btn.classList.toggle('on', on); btn.textContent = gpsTest ? (on ? '\u{1F4CD} Test: click the map' : '\u{1F4CD} Test position') : (on ? '\u{1F4CD} Stop' : '\u{1F4CD} My location'); };
+    const paintBtn = () => { const on = testing || watchId !== null; btn.classList.toggle('on', on); btn.textContent = gpsTest ? (on ? '\u{1F4CD} Test: click the map' : '\u{1F4CD} Test position') : t(on ? 'stop' : 'myLocation'); };
     paintBtn();
+    langHooks.push(() => { paintBtn(); if (me) setMe(me.x3, me.z3, me.acc); });
 
     function clearMe() { if (me) { me.el.remove(); me = null; } }
     function setMe(x3, z3, accuracy) {
@@ -351,8 +364,8 @@ function start() {
         el.innerHTML = '<span class="me-dot"></span><span class="me-label"></span>';
         pinLayer.appendChild(el); me = { el, label: el.querySelector('.me-label'), x3, z3 };
       }
-      me.x3 = x3; me.z3 = z3;
-      me.label.textContent = (meName() || GPS.defaultName || 'You') + (accuracy ? ' \u00B1' + Math.round(accuracy) + ' m' : '');
+      me.x3 = x3; me.z3 = z3; me.acc = accuracy;
+      me.label.textContent = (meName() || (GPS.defaultName && GPS.defaultName !== 'You' ? GPS.defaultName : t('you'))) + (accuracy ? ' \u00B1' + Math.round(accuracy) + ' m' : '');
     }
     const toScene = (px, py) => ({ x: (px - MAP_CENTER.x) / MAP_SCALE, z: (py - MAP_CENTER.y) / MAP_SCALE });
     function flyToMe() {
@@ -365,14 +378,14 @@ function start() {
       if (p.x < gpsBox.x0 - GPS_MARGIN || p.x > gpsBox.x1 + GPS_MARGIN || p.y < gpsBox.y0 - GPS_MARGIN || p.y > gpsBox.y1 + GPS_MARGIN) {
         clearMe();
         const d = mapper.distanceMeters(lat, lng);
-        toast('You are outside the campus map (' + (d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m') + ' from it).');
+        toast(t('outside', { d: d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m' }));
         return;
       }
       const s = toScene(p.x, p.y); setMe(s.x, s.z, accuracy);
       if (firstFix) { firstFix = false; flyToMe(); }
     }
     function onError(err) {
-      const msg = { 1: 'Location permission was denied. Allow it in the browser settings to use this.', 2: 'Your position is not available right now.', 3: 'Getting your position took too long. Try again outdoors.' }[err.code] || 'Could not get your position.';
+      const msg = t({ 1: 'err1', 2: 'err2', 3: 'err3' }[err.code] || 'errX');
       toast(msg);
       if (err.code === 1) stopWatch();       // denied: give up.  Signal lost / slow fix: keep watching, the marker stays where it was
     }
@@ -385,13 +398,13 @@ function start() {
         testing = !testing; if (!testing) clearMe(); else toast('Click anywhere on the map to place yourself there.'); paintBtn(); return;
       }
       if (watchId !== null) { stopWatch(); return; }
-      if (!('geolocation' in navigator)) { toast('This browser cannot read your location.'); return; }
-      if (!window.isSecureContext) { toast('Location only works on a secure (https) page.'); return; }
+      if (!('geolocation' in navigator)) { toast(t('noGeo')); return; }
+      if (!window.isSecureContext) { toast(t('needHttps')); return; }
       if (!meName()) {                                                 // ask once, then remember
-        let n = null; try { n = window.prompt('Your name on the map?', GPS.defaultName || 'You'); } catch (err) { /* ignore */ }
+        let n = null; try { n = window.prompt(t('askName'), GPS.defaultName && GPS.defaultName !== 'You' ? GPS.defaultName : t('you')); } catch (err) { /* ignore */ }
         if (n && n.trim()) { try { localStorage.setItem(NAME_KEY, n.trim().slice(0, 24)); } catch (err) { /* ignore */ } }
       }
-      toast('Finding your position\u2026', 8000);
+      toast(t('finding'), 8000);
       watchId = navigator.geolocation.watchPosition((pos) => { toastEl.classList.remove('show'); onFix(pos); }, onError, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
       paintBtn();
     });
@@ -417,22 +430,39 @@ function start() {
   const fx = world.effects;
   if (fx && fx.themes) {
     const mBtn = document.createElement('button');
-    mBtn.type = 'button'; mBtn.className = 'menu-btn'; mBtn.setAttribute('aria-label', 'Menu');
+    mBtn.type = 'button'; mBtn.className = 'menu-btn'; mBtn.setAttribute('aria-label', t('menu'));
     mBtn.setAttribute('aria-haspopup', 'true'); mBtn.setAttribute('aria-expanded', 'false');
     mBtn.innerHTML = '<span></span><span></span><span></span>';
     const mPanel = document.createElement('div'); mPanel.className = 'menu-panel card'; mPanel.hidden = true;
-    const head = document.createElement('p'); head.className = 'menu-title'; head.textContent = 'Ground';
+    const head = document.createElement('p'); head.className = 'menu-title'; head.textContent = t('ground');
     mPanel.appendChild(head);
-    const opts = fx.themes.map((t) => {
+    const opts = fx.themes.map((th) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'theme-opt'; b.dataset.id = t.id;
+      b.type = 'button'; b.className = 'theme-opt'; b.dataset.id = th.id;
       b.innerHTML = '<span class="theme-swatch"></span><span class="theme-name"></span><span class="theme-wx"></span>';
-      b.querySelector('.theme-swatch').style.background = t.swatch;
-      b.querySelector('.theme-name').textContent = t.icon + ' ' + t.name;
-      b.querySelector('.theme-wx').textContent = t.weather || '';
-      b.addEventListener('click', () => fx.setTheme(t.id));
+      b.querySelector('.theme-swatch').style.background = th.swatch;
+      b.addEventListener('click', () => fx.setTheme(th.id));
       mPanel.appendChild(b); return b;
     });
+    const paintThemes = () => fx.themes.forEach((th, i) => {
+      opts[i].querySelector('.theme-name').textContent = th.icon + ' ' + t('theme.' + th.id, null, th.name);
+      opts[i].querySelector('.theme-wx').textContent = th.weather ? t('wx.' + th.id, null, th.weather) : '';
+    });
+    // language picker
+    const langHead = document.createElement('p'); langHead.className = 'menu-title menu-title-lang';
+    const langRow = document.createElement('div'); langRow.className = 'lang-row'; langRow.setAttribute('role', 'group');
+    const langBtns = LANGS.map((L) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'lang-opt'; b.dataset.id = L.id; b.textContent = L.label; b.lang = L.id;
+      b.addEventListener('click', () => setLang(L.id));
+      langRow.appendChild(b); return b;
+    });
+    mPanel.append(langHead, langRow);
+    const paintLang = () => {
+      head.textContent = t('ground'); langHead.textContent = t('language'); mBtn.setAttribute('aria-label', t('menu')); paintThemes();
+      langBtns.forEach((b) => { const on = b.dataset.id === getLang(); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    };
+    langHooks.push(paintLang);
     const paintMenu = (st) => opts.forEach((b) => { const on = b.dataset.id === st.theme; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
     fx.onChange(paintMenu); paintMenu(fx.state);
     const setOpen = (open) => { mPanel.hidden = !open; mBtn.classList.toggle('open', open); mBtn.setAttribute('aria-expanded', String(open)); };
@@ -443,6 +473,8 @@ function start() {
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
     document.body.append(mBtn, mPanel);
   }
+
+  langHooks.forEach((f) => f());       // paint every label in the starting language
 
   /* ---------- main loop ---------- */
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

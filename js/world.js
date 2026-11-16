@@ -16,6 +16,7 @@ import {
   MONUMENT
 } from './config.js';
 import * as CFG from './config.js';
+import { t as tr, onLang } from './i18n.js';
 
 // Effect defaults. Override them by exporting EFFECTS from config.js (see config.js).
 const FX = Object.assign(
@@ -1460,9 +1461,9 @@ scene.fog = new THREE.Fog(
   };
 
   if (FX.ui && typeof document !== 'undefined') {
-    const pos = { 'bottom-left': 'bottom:16px;left:16px', 'bottom-right': 'bottom:16px;right:16px', 'top-left': 'top:16px;left:16px', 'top-right': 'top:16px;right:16px' }[FX.uiCorner] || 'bottom:16px;left:16px';
+    const pos = { 'bottom-left': 'bottom:16px;left:16px', 'bottom-right': 'bottom:16px;right:16px', 'top-left': 'top:16px;left:84px', 'top-right': 'top:16px;right:16px' }[FX.uiCorner] || 'bottom:16px;left:16px';
     const bar = document.createElement('div');
-    bar.style.cssText = 'position:fixed;z-index:30;display:flex;gap:8px;font:600 13px system-ui,sans-serif;' + pos;
+    bar.style.cssText = 'position:fixed;z-index:30;display:flex;gap:8px;font:600 13px system-ui,Noto Sans Thai,Noto Sans Lao,sans-serif;' + pos;
     const mk = (onClick) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -1476,13 +1477,14 @@ scene.fog = new THREE.Fog(
     const bFire = mk(() => effects.toggleFireworks());
     const bWeather = mk(() => effects.toggleWeather());
     const paint = (st) => {
-      bTime.textContent = st.night ? '\u{1F319} Night' : '\u2600\uFE0F Day'; style(bTime, !st.night);
-      bFire.textContent = '\u{1F386} Fireworks'; style(bFire, st.fireworks);
+      bTime.textContent = tr(st.night ? 'night' : 'day'); style(bTime, !st.night);
+      bFire.textContent = tr('fireworks'); style(bFire, st.fireworks);
       const W = THEMES[st.theme].weather;                              // this button follows the ground theme
       bWeather.style.display = W ? '' : 'none';
-      if (W) { bWeather.textContent = W.label; style(bWeather, st.weather); }
+      if (W) { bWeather.textContent = tr('wx.' + st.theme, null, W.label); style(bWeather, st.weather); }
     };
     effects.onChange(paint); paint(fxState);
+    onLang(() => paint(fxState));
     document.body.appendChild(bar);
   }
 
