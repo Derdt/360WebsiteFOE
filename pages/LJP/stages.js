@@ -6,7 +6,7 @@ export const stages = {
   // ==========================================
   
   f1_stage1: { // Start point (E1)[cite: 7]
-    image: '/images/LJP/L_JP.jpg',
+    image: '../images/LJP/L_JP.jpg',
     heading: 85,
     links: [
     ]

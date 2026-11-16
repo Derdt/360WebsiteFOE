@@ -7,7 +7,7 @@ export const stages = {
   
   // Start Spot (Red Outline)[cite: 1]
   f1_1: {
-    image: '/images/CEIT/HallWay_1_Entrance.jpg',
+    image: '../images/CEIT/HallWay_1_Entrance.jpg',
     heading: 90,
     links: [
       { targetStageId: 'f1_2', position: new THREE.Vector3(-6, -2, -1.5) },
@@ -16,7 +16,7 @@ export const stages = {
   },
 
   f1_2: {
-    image: '/images/CEIT/HallWay_1_DMid.jpg',
+    image: '../images/CEIT/HallWay_1_DMid.jpg',
     heading: 73,
     links: [
       { targetStageId: 'f1_1', position: new THREE.Vector3(6, -2, 0) },
@@ -25,7 +25,7 @@ export const stages = {
   },
 
   f1_3: {
-    image: '/images/CEIT/HallWay_1_con.jpg',
+    image: '../images/CEIT/HallWay_1_con.jpg',
     heading: 45,
     links: [
       { targetStageId: 'f1_2', position: new THREE.Vector3(6, -2, 0) },
@@ -34,7 +34,7 @@ export const stages = {
   },
 
   f1_4: {
-    image: '/images/CEIT/ConADown_1.jpg',
+    image: '../images/CEIT/ConADown_1.jpg',
     heading: -40,
     links: [
       { targetStageId: 'f1_3', position: new THREE.Vector3(-2, -2, -6) },
@@ -44,7 +44,7 @@ export const stages = {
   },
 
   f1_5: {
-    image: '/images/CEIT/ConMid_A2.jpg',
+    image: '../images/CEIT/ConMid_A2.jpg',
     heading: 225,
     links: [
       { targetStageId: 'f1_4', position: new THREE.Vector3(4, -2, -4) },
@@ -53,7 +53,7 @@ export const stages = {
   },
 
   f1_6: {
-    image: '/images/CEIT/ConMid_A1.jpg',
+    image: '../images/CEIT/ConMid_A1.jpg',
     heading: 0,
     links: [
       { targetStageId: 'f1_5', position: new THREE.Vector3(4, -2, 0) },
@@ -62,7 +62,7 @@ export const stages = {
   },
 
   f1_7: {
-    image: '/images/CEIT/ConAtop_1.jpg',
+    image: '../images/CEIT/ConAtop_1.jpg',
     heading: 0,
     links: [
       { targetStageId: 'f1_6', position: new THREE.Vector3(4, -2, 2) },
@@ -71,7 +71,7 @@ export const stages = {
   },
 
   f1_8: {
-    image: '/images/CEIT/ConMid_B1.jpg',
+    image: '../images/CEIT/ConMid_B1.jpg',
     heading: 0,
     links: [
       { targetStageId: 'f1_7', position: new THREE.Vector3(-6, -2, 2) },
@@ -80,7 +80,7 @@ export const stages = {
   },
 
   f1_9: {
-    image: '/images/CEIT/ConMid_B2.jpg',
+    image: '../images/CEIT/ConMid_B2.jpg',
     heading: 180,
     links: [
       { targetStageId: 'f1_8', position: new THREE.Vector3(-6, -2, 0) },
@@ -90,7 +90,7 @@ export const stages = {
 
   // Bridge Spot A- (Floor 1 to Floor 2 connector)[cite: 1]
   f1_10: {
-    image: '/images/CEIT/HallWay_Stair_1.jpg',
+    image: '../images/CEIT/HallWay_Stair_1.jpg',
     heading: 20,
     links: [
       { targetStageId: 'f1_1', position: new THREE.Vector3(0, -2, -2) },
@@ -105,7 +105,7 @@ export const stages = {
 
   // Bridge Spot A+ (Floor 2 connector)[cite: 2]
   f2_1: {
-    image: '/images/CEIT/HallWay_Stair_2.jpg',
+    image: '../images/CEIT/HallWay_Stair_2.jpg',
     heading: -60,
     links: [
       { targetStageId: 'f1_10', position: new THREE.Vector3(3, -2, 0) }, // Connects back to Floor 1 (A-)[cite: 1, 2]
@@ -114,7 +114,7 @@ export const stages = {
   },
 
   f2_2: {
-    image: '/images/CEIT/HallWay_2_Library.jpg',
+    image: '../images/CEIT/HallWay_2_Library.jpg',
     heading: -21,
     links: [
       { targetStageId: 'f2_1', position: new THREE.Vector3(1, -2, 5) },
@@ -124,7 +124,7 @@ export const stages = {
   },
 
   f2_3: {
-    image: '/images/CEIT/Library_AEntrance.jpg',
+    image: '../images/CEIT/Library_AEntrance.jpg',
     heading: 0,
     links: [
       { targetStageId: 'f2_2', position: new THREE.Vector3(0, -2, 6) },
@@ -134,7 +134,7 @@ export const stages = {
   },
 
   f2_4: {
-    image: '/images/CEIT/Library_IN_B1.jpg',
+    image: '../images/CEIT/Library_IN_B1.jpg',
     heading: -23,
     links: [
       { targetStageId: 'f2_3', position: new THREE.Vector3(6, -2, -2) },
@@ -143,7 +143,7 @@ export const stages = {
   },
 
   f2_5: {
-    image: '/images/CEIT/Library_IN_B2.jpg',
+    image: '../images/CEIT/Library_IN_B2.jpg',
     heading: 160,
     links: [
       { targetStageId: 'f2_4', position: new THREE.Vector3(6, -2, -1) },
@@ -152,7 +152,7 @@ export const stages = {
   },
 
   f2_6: {
-    image: '/images/CEIT/Library_IN_A2.jpg',
+    image: '../images/CEIT/Library_IN_A2.jpg',
     heading: 45,
     links: [
       { targetStageId: 'f2_5', position: new THREE.Vector3(0, -2, 6) },
@@ -161,7 +161,7 @@ export const stages = {
   },
 
   f2_7: {
-    image: '/images/CEIT/Library_IN_A1.jpg',
+    image: '../images/CEIT/Library_IN_A1.jpg',
     heading: 0,
     links: [
       { targetStageId: 'f2_6', position: new THREE.Vector3(-4, -2, 0) },
@@ -170,7 +170,7 @@ export const stages = {
   },
 
   f2_8: {
-    image: '/images/CEIT/HallWay_2_Library2.jpg',
+    image: '../images/CEIT/HallWay_2_Library2.jpg',
     heading: -100,
     links: [
       { targetStageId: 'f2_2', position: new THREE.Vector3(6, -2, 0) },
@@ -179,7 +179,7 @@ export const stages = {
   },
 
   f2_9: {
-    image: '/images/CEIT/HallWay_2_Library3.jpg',
+    image: '../images/CEIT/HallWay_2_Library3.jpg',
     heading: 90,
     links: [
       { targetStageId: 'f2_8', position: new THREE.Vector3(6, -2, 0) },
@@ -188,7 +188,7 @@ export const stages = {
   },
 
   f2_10: {
-    image: '/images/CEIT/HallWay_2_Library4.jpg',
+    image: '../images/CEIT/HallWay_2_Library4.jpg',
     heading: 15,
     links: [
       { targetStageId: 'f2_9', position: new THREE.Vector3(6, -2, 0) },
@@ -198,7 +198,7 @@ export const stages = {
   },
 
   f2_11: {
-    image: '/images/CEIT/Cyber_Entrance.jpg',
+    image: '../images/CEIT/Cyber_Entrance.jpg',
     heading: 110,
     links: [
       { targetStageId: 'f2_10', position: new THREE.Vector3(2.5, -2, 5) }
@@ -206,7 +206,7 @@ export const stages = {
   },
 
   f2_12: {
-    image: '/images/CEIT/HallWay_2_TheEnd.jpg',
+    image: '../images/CEIT/HallWay_2_TheEnd.jpg',
     heading: -55,
     links: [
       { targetStageId: 'f2_10', position: new THREE.Vector3(6, -2, 0) },
@@ -215,7 +215,7 @@ export const stages = {
   },
 
   f2_13: {
-    image: '/images/CEIT/IMG_20261021_163733_00_076.jpg',
+    image: '../images/CEIT/IMG_20261021_163733_00_076.jpg',
     heading: 60,
     links: [
       { targetStageId: 'f2_12', position: new THREE.Vector3(1.5, -2, 4) },
@@ -224,7 +224,7 @@ export const stages = {
   },
 
   f2_14: {
-    image: '/images/CEIT/IMG_20261021_163656_00_075.jpg',
+    image: '../images/CEIT/IMG_20261021_163656_00_075.jpg',
     heading: 240,
     links: [
       { targetStageId: 'f2_13', position: new THREE.Vector3(0, -2, 6) }
