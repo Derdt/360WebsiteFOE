@@ -17,8 +17,8 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.179.1/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.179.1/examples/jsm/"
+      "three": "./vendor/three/0.179.1/build/three.module.js",
+      "three/addons/": "./vendor/three/0.179.1/examples/jsm/"
     }
   }
   </script>
@@ -43,6 +43,18 @@
 
   <div id="fallback" hidden></div>
   <script type="module" src="js/campus-app.js"></script>
+  <script>
+    // If the 3D map has not started after 20 s (script blocked, very slow network, no WebGL),
+    // show a message instead of leaving visitors with a blank screen.
+    setTimeout(function () {
+      if (document.querySelector('#stage canvas')) return;
+      var f = document.getElementById('fallback');
+      if (f && f.hidden) {
+        f.textContent = 'The 3D campus map could not start. Please check your internet connection and reload the page, or try another browser (Chrome, Edge, Safari or Firefox).';
+        f.hidden = false;
+      }
+    }, 20000);
+  </script>
 </body>
 
 </html>

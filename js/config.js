@@ -36,7 +36,7 @@ export const EFFECTS = { night: true, fireworks: true, weather: false, theme: 'w
 export const GPS = {
   enabled: true,
   refs: [
-    { lat: 17.939896024230634, lng: 102.62491889372168, model: 'Road_building.glb' },
+    { lat: 17.939896024230634, lng: 102.62491889372168, model: 'Road_Building.glb' },
     // { lat: 0, lng: 0, model: 'EN.glb' },          // <- add a 2nd point here to make positions accurate
   ],
   metersPerPixel: 0.5,   // only used while there is ONE ref: real metres per map pixel (an estimate!)
@@ -461,7 +461,7 @@ export const BUILDINGS = [
 
   { 
 
-    model: 'Road_building.glb',
+    model: 'Road_Building.glb',
 
     modelScale: 0.22,
     modelRotation:Math.PI / -2,
@@ -496,7 +496,7 @@ export const BUILDINGS = [
     modelRotation: 0,
     modelYOffset: 0,
 
-    model: 'ASIVA1_UD.glb',
+    model: 'Asiva1_UD.glb',
 
     x: 298, y: 430, w: 78, h: 38, f: 2, flat: true,
 
