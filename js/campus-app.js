@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { VR_DIR, BUILDINGS, MAP_SCALE, MAP_CENTER, GPS } from './config.js';
-import { createGeoMapper } from './gps-map.js';
+import { createGeoMapper } from './Gps-map.js';
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage'), pinLayer = $('pins');
